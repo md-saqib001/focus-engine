@@ -1,45 +1,52 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
-// Discriminated union: TypeScript itself prevents passing a duration for a standard session
-type CreateSessionArgs =
+type SaveSessionArgs =
   | {
       mode: 'pomodoro'
       sessionType: 'focus' | 'shortBreak' | 'longBreak'
+      startTime: number
+      endTime: number
       durationPlannedSec: number
+      durationActualSec: number
+      completed: boolean
+      endReason: 'auto_complete' | 'abandoned'
     }
   | {
       mode: 'standard'
+      startTime: number
+      endTime: number
+      durationActualSec: number
+      completed: boolean
+      endReason: 'manual_stop' | 'force_ended'
     }
-
-interface CompleteSessionArgs {
-  sessionId: string
-  durationActualSec: number
-  completed: boolean
-  endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
-}
 
 // The API exposed to the renderer process via contextBridge
 const focusEngineAPI = {
-  createSession: (args: CreateSessionArgs) => {
-    // Normalize into the flat shape the IPC handler expects
+  saveSession: (args: SaveSessionArgs) => {
     if (args.mode === 'pomodoro') {
-      return ipcRenderer.invoke('session:create', {
+      return ipcRenderer.invoke('session:save', {
         mode: args.mode,
         sessionType: args.sessionType,
-        durationPlannedSec: args.durationPlannedSec
+        startTime: args.startTime,
+        endTime: args.endTime,
+        durationPlannedSec: args.durationPlannedSec,
+        durationActualSec: args.durationActualSec,
+        completed: args.completed,
+        endReason: args.endReason
       })
     } else {
-      return ipcRenderer.invoke('session:create', {
+      return ipcRenderer.invoke('session:save', {
         mode: args.mode,
         sessionType: null,
-        durationPlannedSec: null
+        startTime: args.startTime,
+        endTime: args.endTime,
+        durationPlannedSec: null,
+        durationActualSec: args.durationActualSec,
+        completed: args.completed,
+        endReason: args.endReason
       })
     }
-  },
-
-  completeSession: (args: CompleteSessionArgs) => {
-    return ipcRenderer.invoke('session:complete', args)
   },
 
   getAllSessions: () => {

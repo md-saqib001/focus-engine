@@ -1,22 +1,24 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
-// Discriminated union for createSession arguments
-type CreateSessionArgs =
+type SaveSessionArgs =
   | {
       mode: 'pomodoro'
       sessionType: 'focus' | 'shortBreak' | 'longBreak'
+      startTime: number
+      endTime: number
       durationPlannedSec: number
+      durationActualSec: number
+      completed: boolean
+      endReason: 'auto_complete' | 'abandoned'
     }
   | {
       mode: 'standard'
+      startTime: number
+      endTime: number
+      durationActualSec: number
+      completed: boolean
+      endReason: 'manual_stop' | 'force_ended'
     }
-
-interface CompleteSessionArgs {
-  sessionId: string
-  durationActualSec: number
-  completed: boolean
-  endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
-}
 
 interface SessionRow {
   session_id: string
@@ -39,8 +41,7 @@ interface IPCResult<T = unknown> {
 }
 
 interface FocusEngineAPI {
-  createSession: (args: CreateSessionArgs) => Promise<IPCResult<SessionRow>>
-  completeSession: (args: CompleteSessionArgs) => Promise<IPCResult<SessionRow>>
+  saveSession: (args: SaveSessionArgs) => Promise<IPCResult<SessionRow>>
   getAllSessions: () => Promise<IPCResult<SessionRow[]>>
 }
 

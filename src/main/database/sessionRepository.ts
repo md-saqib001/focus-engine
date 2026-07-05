@@ -16,98 +16,100 @@ export interface SessionRow {
 }
 
 /**
- * Creates a new session row. Validates the mode/duration contract:
- *  - Pomodoro MUST have a non-null durationPlannedSec and sessionType
- *  - Standard MUST have null durationPlannedSec and null sessionType
- *
- * This contract is enforced here rather than at the DB level so the error
- * message is clear and debuggable, rather than a cryptic constraint violation.
+ * Saves a completed/terminated session to the database.
+ * Volatile state is held in React; SQLite is only written to once when the session reaches
+ * a terminal state (completed, abandoned, or force ended) to prevent database desync.
+ * 
+ * Enforces the Mode/Duration/Type contracts:
+ *  - Pomodoro MUST have planned duration and session type
+ *  - Standard MUST NOT have planned duration or session type
  */
-export function createSession(
-  mode: 'pomodoro' | 'standard',
-  sessionType: 'focus' | 'shortBreak' | 'longBreak' | null,
+export function saveSession(params: {
+  mode: 'pomodoro' | 'standard'
+  sessionType: 'focus' | 'shortBreak' | 'longBreak' | null
+  startTime: number
+  endTime: number
   durationPlannedSec: number | null
-): SessionRow {
-  // Validate mode/duration contract
+  durationActualSec: number
+  completed: boolean
+  endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
+}): SessionRow {
+  const {
+    mode,
+    sessionType,
+    startTime,
+    endTime,
+    durationPlannedSec,
+    durationActualSec,
+    completed,
+    endReason
+  } = params
+
+  // Validate mode contract
   if (mode === 'pomodoro') {
     if (durationPlannedSec === null || durationPlannedSec <= 0) {
       throw new Error(
         `[SessionRepository] Pomodoro session requires a positive durationPlannedSec, ` +
-        `but received: ${durationPlannedSec}. A pomodoro session without a planned ` +
-        `duration would break countdown logic and analytics.`
+        `but received: ${durationPlannedSec}.`
       )
     }
     if (sessionType === null) {
       throw new Error(
-        `[SessionRepository] Pomodoro session requires a sessionType ` +
-        `('focus' | 'shortBreak' | 'longBreak'), but received null.`
+        `[SessionRepository] Pomodoro session requires a sessionType, but received null.`
       )
     }
   } else if (mode === 'standard') {
     if (durationPlannedSec !== null) {
       throw new Error(
         `[SessionRepository] Standard session must NOT have a durationPlannedSec ` +
-        `(received: ${durationPlannedSec}). Standard sessions are open-ended — ` +
-        `a planned duration would silently break analytics assumptions since there ` +
-        `is no countdown target to measure completion against.`
+        `(received: ${durationPlannedSec}).`
       )
     }
     if (sessionType !== null) {
       throw new Error(
         `[SessionRepository] Standard session must NOT have a sessionType ` +
-        `(received: ${sessionType}). Session types are a pomodoro-only concept.`
+        `(received: ${sessionType}).`
       )
     }
   }
 
   const db = getDatabase()
   const sessionId = randomUUID()
-  const startTime = Date.now()
 
   const stmt = db.prepare(`
-    INSERT INTO sessions (session_id, session_mode, session_type, start_time, duration_planned_sec)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO sessions (
+      session_id, session_mode, session_type, start_time, end_time,
+      duration_planned_sec, duration_actual_sec, completed, end_reason, created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
-  stmt.run(sessionId, mode, sessionType, startTime, durationPlannedSec)
+  stmt.run(
+    sessionId,
+    mode,
+    sessionType,
+    startTime,
+    endTime,
+    durationPlannedSec,
+    durationActualSec,
+    completed ? 1 : 0,
+    endReason,
+    startTime // Use session start time as created_at baseline
+  )
 
   return {
     session_id: sessionId,
     session_mode: mode,
     session_type: sessionType,
     start_time: startTime,
-    end_time: null,
+    end_time: endTime,
     duration_planned_sec: durationPlannedSec,
-    duration_actual_sec: null,
-    completed: 0,
-    end_reason: null,
+    duration_actual_sec: durationActualSec,
+    completed: completed ? 1 : 0,
+    end_reason: endReason,
     focus_score: null,
     created_at: startTime
   }
-}
-
-/**
- * Completes (or abandons) a session. Records the actual duration,
- * whether the session counted as completed, and HOW it ended.
- */
-export function completeSession(
-  sessionId: string,
-  durationActualSec: number,
-  completed: boolean,
-  endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
-): SessionRow | null {
-  const db = getDatabase()
-  const endTime = Date.now()
-
-  const stmt = db.prepare(`
-    UPDATE sessions
-    SET end_time = ?, duration_actual_sec = ?, completed = ?, end_reason = ?
-    WHERE session_id = ?
-  `)
-
-  stmt.run(endTime, durationActualSec, completed ? 1 : 0, endReason, sessionId)
-
-  return getSessionById(sessionId)
 }
 
 /**
