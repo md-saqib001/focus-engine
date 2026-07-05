@@ -2,6 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { getDatabase, closeDatabase } from './database/db'
+import { registerSessionHandlers } from './ipc/sessionHandlers'
 
 function createWindow(): void {
   // Create the browser window.
@@ -52,6 +54,12 @@ app.whenReady().then(() => {
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
 
+  // Initialize database (creates file + schema if first run)
+  getDatabase()
+
+  // Register all IPC handlers
+  registerSessionHandlers()
+
   createWindow()
 
   app.on('activate', function () {
@@ -68,6 +76,11 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// Clean up database connection on quit
+app.on('before-quit', () => {
+  closeDatabase()
 })
 
 // In this file you can include the rest of your app's specific main process

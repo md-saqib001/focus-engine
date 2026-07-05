@@ -17,6 +17,9 @@ export const useTimerEngine = () => {
   const accumulatedSecondsRef = useRef<number>(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Track the current session's DB ID for completing it later
+  const sessionIdRef = useRef<string | null>(null)
+
   // Clear interval helper
   const clearIntervalRef = useCallback(() => {
     if (intervalRef.current) {
@@ -30,10 +33,15 @@ export const useTimerEngine = () => {
     return () => clearIntervalRef()
   }, [clearIntervalRef])
 
+  // Helper: compute total elapsed seconds right now
+  const getElapsedSeconds = useCallback((): number => {
+    const elapsedSinceLastStart = Math.floor((Date.now() - startTimeRef.current) / 1000)
+    return accumulatedSecondsRef.current + elapsedSinceLastStart
+  }, [])
+
   // Core tick updater calculating precise time from Date timestamps
   const tick = useCallback(() => {
-    const elapsedSinceLastStart = Math.floor((Date.now() - startTimeRef.current) / 1000)
-    const totalElapsedSeconds = accumulatedSecondsRef.current + elapsedSinceLastStart
+    const totalElapsedSeconds = getElapsedSeconds()
 
     if (mode === 'pomodoro') {
       const remaining = totalDurationSeconds - totalElapsedSeconds
@@ -41,16 +49,26 @@ export const useTimerEngine = () => {
         clearIntervalRef()
         setTime(0)
         setState('completed')
+        // Pomodoro auto-completion: persist to DB
+        if (sessionIdRef.current) {
+          window.focusEngineAPI.completeSession({
+            sessionId: sessionIdRef.current,
+            durationActualSec: totalDurationSeconds,
+            completed: true,
+            endReason: 'auto_complete'
+          })
+          sessionIdRef.current = null
+        }
       } else {
         setTime(remaining)
       }
     } else {
       setTime(totalElapsedSeconds)
     }
-  }, [mode, totalDurationSeconds, clearIntervalRef])
+  }, [mode, totalDurationSeconds, clearIntervalRef, getElapsedSeconds])
 
   // Start standard mode (stopwatch)
-  const startStandard = useCallback(() => {
+  const startStandard = useCallback(async () => {
     clearIntervalRef()
     setMode('standard')
     setSessionType(null)
@@ -61,11 +79,21 @@ export const useTimerEngine = () => {
     setTime(0)
     setTotalDurationSeconds(0)
 
-    intervalRef.current = setInterval(tick, 200) // fast tick for UI responsiveness
+    // Persist session creation to DB
+    try {
+      const result = await window.focusEngineAPI.createSession({ mode: 'standard' })
+      if (result.success && result.data) {
+        sessionIdRef.current = result.data.session_id
+      }
+    } catch (err) {
+      console.error('[useTimerEngine] Failed to create standard session:', err)
+    }
+
+    intervalRef.current = setInterval(tick, 200)
   }, [clearIntervalRef, tick])
 
   // Start pomodoro mode (countdown)
-  const startPomodoro = useCallback((type: SessionType, durationMinutes: number) => {
+  const startPomodoro = useCallback(async (type: SessionType, durationMinutes: number) => {
     clearIntervalRef()
     setMode('pomodoro')
     setSessionType(type)
@@ -76,6 +104,20 @@ export const useTimerEngine = () => {
     accumulatedSecondsRef.current = 0
     setTime(durationSeconds)
     setTotalDurationSeconds(durationSeconds)
+
+    // Persist session creation to DB
+    try {
+      const result = await window.focusEngineAPI.createSession({
+        mode: 'pomodoro',
+        sessionType: type,
+        durationPlannedSec: durationSeconds
+      })
+      if (result.success && result.data) {
+        sessionIdRef.current = result.data.session_id
+      }
+    } catch (err) {
+      console.error('[useTimerEngine] Failed to create pomodoro session:', err)
+    }
 
     intervalRef.current = setInterval(tick, 200)
   }, [clearIntervalRef, tick])
@@ -101,31 +143,68 @@ export const useTimerEngine = () => {
     startTimeRef.current = Date.now()
     
     intervalRef.current = setInterval(tick, 200)
-  }, [state, clearIntervalRef, tick])
+  }, [state, tick])
 
-  // Manual end / Stop session
+  // Manual end / Stop session — primary way to end a standard session
   const stop = useCallback(() => {
     clearIntervalRef()
+    const actualDuration = getElapsedSeconds()
     setState('completed')
-  }, [clearIntervalRef])
 
-  // Reset / Abort session
+    // Persist to DB: manual stop
+    if (sessionIdRef.current) {
+      window.focusEngineAPI.completeSession({
+        sessionId: sessionIdRef.current,
+        durationActualSec: actualDuration,
+        completed: true,
+        endReason: 'manual_stop'
+      })
+      sessionIdRef.current = null
+    }
+  }, [clearIntervalRef, getElapsedSeconds])
+
+  // Reset / Abort session — pomodoro only (standard doesn't show Reset)
   const reset = useCallback(() => {
     clearIntervalRef()
+    const actualDuration = getElapsedSeconds()
+
+    // If a session was in progress, mark it as abandoned in the DB
+    if (sessionIdRef.current && (state === 'running' || state === 'paused')) {
+      window.focusEngineAPI.completeSession({
+        sessionId: sessionIdRef.current,
+        durationActualSec: actualDuration,
+        completed: false,
+        endReason: 'abandoned'
+      })
+      sessionIdRef.current = null
+    }
+
     setState('idle')
     setTime(0)
     setTotalDurationSeconds(0)
     accumulatedSecondsRef.current = 0
     startTimeRef.current = 0
-  }, [clearIntervalRef])
+  }, [clearIntervalRef, getElapsedSeconds, state])
 
-  // TODO Phase 4: buffer engine will call an internal forceEnd(reason) here when sustained
+  // TODO Phase 4: buffer engine will call forceEnd(reason) here when sustained
   // distraction is detected during a standard-mode session.
+  // The hook shape is ready so Day 33 doesn't require restructuring this file.
   const forceEnd = useCallback((reason: string) => {
     console.warn(`Session force-ended: ${reason}`)
     clearIntervalRef()
+    const actualDuration = getElapsedSeconds()
     setState('completed')
-  }, [clearIntervalRef])
+
+    if (sessionIdRef.current) {
+      window.focusEngineAPI.completeSession({
+        sessionId: sessionIdRef.current,
+        durationActualSec: actualDuration,
+        completed: false,
+        endReason: 'force_ended'
+      })
+      sessionIdRef.current = null
+    }
+  }, [clearIntervalRef, getElapsedSeconds])
 
   // Minutes and seconds elapsed or remaining
   const minutes = Math.floor(time / 60)

@@ -1,6 +1,26 @@
+# Dependencies
 node_modules
+
+# Build output
 dist
 out
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# Editor / IDE
 .eslintcache
 *.log*
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# SQLite database files (created at runtime in userData, but
+# if someone accidentally copies one into the repo)
+*.db
+*.db-wal
+*.db-shm
+
+# Electron build artifacts
+release/
