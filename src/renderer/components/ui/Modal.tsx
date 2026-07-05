@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 
 export interface ModalProps {
@@ -38,7 +39,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
     }
   }
 
-  return (
+  const modalContent = (
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
@@ -54,7 +55,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
+        zIndex: 9999, // Ensure modal floats above everything
         animation: 'fadeIn 0.2s ease-out'
       }}
     >
@@ -128,4 +129,6 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
       `}</style>
     </div>
   )
+
+  return createPortal(modalContent, document.body)
 }

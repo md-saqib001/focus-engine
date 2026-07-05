@@ -1,12 +1,8 @@
 import React from 'react'
 
-export interface ButtonProps {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
-  onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void
-  disabled?: boolean
-  children: React.ReactNode
-  style?: React.CSSProperties
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -15,7 +11,10 @@ export const Button: React.FC<ButtonProps> = ({
   onClick,
   disabled = false,
   children,
-  style
+  style,
+  className = '',
+  type = 'button',
+  ...props
 }) => {
   // Styles based on variant
   const getVariantStyles = (): React.CSSProperties => {
@@ -103,10 +102,12 @@ export const Button: React.FC<ButtonProps> = ({
 
   return (
     <button
+      type={type}
       onClick={onClick}
       disabled={disabled}
       style={finalStyles}
-      className={`btn-ui btn-ui-${variant} ${disabled ? 'btn-ui-disabled' : ''}`}
+      className={`btn-ui btn-ui-${variant} ${disabled ? 'btn-ui-disabled' : ''} ${className}`}
+      {...props}
     >
       {children}
       {!disabled && (
