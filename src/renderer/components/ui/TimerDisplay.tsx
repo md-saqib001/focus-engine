@@ -3,10 +3,18 @@ import React from 'react'
 export interface TimerDisplayProps {
   minutes: number
   seconds: number
-  state: 'idle' | 'running' | 'paused'
+  state: 'idle' | 'running' | 'paused' | 'completed'
+  mode?: 'pomodoro' | 'standard'
+  progress?: number | null
 }
 
-export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, state }) => {
+export const TimerDisplay: React.FC<TimerDisplayProps> = ({
+  minutes,
+  seconds,
+  state,
+  mode = 'pomodoro',
+  progress = null
+}) => {
   // Format MM:SS with leading zeroes
   const formattedMinutes = String(minutes).padStart(2, '0')
   const formattedSeconds = String(seconds).padStart(2, '0')
@@ -18,6 +26,8 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, st
         return '#818cf8' // Accent purple
       case 'paused':
         return '#f59e0b' // Amber
+      case 'completed':
+        return '#10b981' // Green on complete
       case 'idle':
       default:
         return '#64748b' // Grey
@@ -31,11 +41,10 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, st
   const strokeWidth = 8
   const circumference = 2 * Math.PI * radius
   
-  // Calculate progress based on a standard 25-minute session for visual estimation
-  const totalSeconds = 25 * 60
-  const currentSeconds = minutes * 60 + seconds
-  const ratio = totalSeconds > 0 ? currentSeconds / totalSeconds : 1
-  const strokeDashoffset = circumference - ratio * circumference
+  // Calculate progress ratio (default to remaining ratio if not explicitly passed)
+  const isStandard = mode === 'standard'
+  const finalRatio = progress !== null ? progress : 1
+  const strokeDashoffset = circumference - finalRatio * circumference
 
   return (
     <div
@@ -70,22 +79,25 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, st
           fill="transparent"
           stroke="#1e1e2f"
           strokeWidth={strokeWidth}
+          strokeDasharray={isStandard ? '4 4' : 'none'} // Dashed in standard mode to represent open-endedness
         />
-        {/* Foreground Circle representing progress */}
-        <circle
-          cx="100"
-          cy="100"
-          r={radius}
-          fill="transparent"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
-          strokeLinecap="round"
-          style={{
-            transition: 'stroke-dashoffset 0.5s ease, stroke 0.3s ease'
-          }}
-        />
+        {/* Foreground Circle representing progress (only in Pomodoro mode) */}
+        {!isStandard && (
+          <circle
+            cx="100"
+            cy="100"
+            r={radius}
+            fill="transparent"
+            stroke={color}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            style={{
+              transition: 'stroke-dashoffset 0.3s ease, stroke 0.3s ease'
+            }}
+          />
+        )}
       </svg>
 
       {/* Timer Text */}
@@ -95,12 +107,14 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, st
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          zIndex: 10
+          zIndex: 10,
+          textAlign: 'center',
+          padding: '0 20px'
         }}
       >
         <span
           style={{
-            fontSize: '48px',
+            fontSize: '40px',
             fontWeight: 700,
             color: '#f8fafc',
             fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
@@ -111,7 +125,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, st
         </span>
         <span
           style={{
-            fontSize: '12px',
+            fontSize: '11px',
             fontWeight: 600,
             textTransform: 'uppercase',
             color: color,
@@ -122,6 +136,19 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({ minutes, seconds, st
         >
           {state}
         </span>
+        {isStandard && (
+          <span
+            style={{
+              fontSize: '9px',
+              color: '#475569',
+              marginTop: '6px',
+              maxWidth: '120px',
+              lineHeight: '1.2'
+            }}
+          >
+            Open-ended session (no progress ring)
+          </span>
+        )}
       </div>
     </div>
   )

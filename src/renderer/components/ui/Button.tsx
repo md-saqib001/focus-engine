@@ -6,6 +6,7 @@ export interface ButtonProps {
   onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void
   disabled?: boolean
   children: React.ReactNode
+  style?: React.CSSProperties
 }
 
 export const Button: React.FC<ButtonProps> = ({
@@ -13,7 +14,8 @@ export const Button: React.FC<ButtonProps> = ({
   size = 'md',
   onClick,
   disabled = false,
-  children
+  children,
+  style
 }) => {
   // Styles based on variant
   const getVariantStyles = (): React.CSSProperties => {
@@ -95,7 +97,8 @@ export const Button: React.FC<ButtonProps> = ({
   const finalStyles = {
     ...baseStyles,
     ...getVariantStyles(),
-    ...getSizeStyles()
+    ...getSizeStyles(),
+    ...style
   }
 
   return (
