@@ -13,7 +13,7 @@ const MainLayout: React.FC = () => {
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: '#0f0f17', color: '#f8fafc', fontFamily: 'Inter, sans-serif' }}>
       {/* Sidebar */}
-      <aside style={{ width: '260px', backgroundColor: '#181824', borderRight: '1px solid #232336', display: 'flex', flexDirection: 'col' as any, flexShrink: 0 }}>
+      <aside style={{ width: '260px', backgroundColor: '#181824', borderRight: '1px solid #232336', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
         <div style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}>
           {/* Logo Section */}
           <div style={{ padding: '24px', display: 'flex', alignItems: 'center', gap: '12px', borderBottom: '1px solid #232336' }}>
