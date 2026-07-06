@@ -1,6 +1,7 @@
 import React from 'react'
 
 export interface TimerDisplayProps {
+  hours?: number
   minutes: number
   seconds: number
   state: 'idle' | 'running' | 'paused' | 'completed'
@@ -9,13 +10,15 @@ export interface TimerDisplayProps {
 }
 
 export const TimerDisplay: React.FC<TimerDisplayProps> = ({
+  hours = 0,
   minutes,
   seconds,
   state,
   mode = 'pomodoro',
   progress = null
 }) => {
-  // Format MM:SS with leading zeroes
+  // Format HH:MM:SS or MM:SS with leading zeroes
+  const formattedHours = String(hours).padStart(2, '0')
   const formattedMinutes = String(minutes).padStart(2, '0')
   const formattedSeconds = String(seconds).padStart(2, '0')
 
@@ -121,7 +124,7 @@ export const TimerDisplay: React.FC<TimerDisplayProps> = ({
             letterSpacing: '-1px'
           }}
         >
-          {formattedMinutes}:{formattedSeconds}
+          {hours > 0 ? `${formattedHours}:${formattedMinutes}:${formattedSeconds}` : `${formattedMinutes}:${formattedSeconds}`}
         </span>
         <span
           style={{

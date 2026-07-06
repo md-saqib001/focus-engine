@@ -148,8 +148,9 @@ export const useTimerEngine = () => {
     setState('completed')
   }, [clearIntervalRef])
 
-  // Minutes and seconds elapsed or remaining
-  const minutes = Math.floor(time / 60)
+  // Hours, minutes, and seconds elapsed or remaining
+  const hours = Math.floor(time / 3600)
+  const minutes = Math.floor((time % 3600) / 60)
   const seconds = time % 60
 
   const progress = mode === 'pomodoro' && totalDurationSeconds > 0 
@@ -161,6 +162,7 @@ export const useTimerEngine = () => {
     setMode,
     state,
     sessionType,
+    hoursElapsedOrRemaining: hours,
     minutesElapsedOrRemaining: minutes,
     secondsElapsedOrRemaining: seconds,
     progress,

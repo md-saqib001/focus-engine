@@ -10,6 +10,7 @@ const DashboardContent: React.FC = () => {
     mode,
     setMode,
     timerState,
+    hoursElapsedOrRemaining,
     minutesElapsedOrRemaining,
     secondsElapsedOrRemaining,
     progress,
@@ -65,8 +66,12 @@ const DashboardContent: React.FC = () => {
   }
 
   const formatSummaryDuration = (sec: number): string => {
-    const m = Math.floor(sec / 60)
+    const h = Math.floor(sec / 3600)
+    const m = Math.floor((sec % 3600) / 60)
     const s = sec % 60
+    if (h > 0) {
+      return `${h}h ${m}m ${s}s`
+    }
     return `${m}m ${s}s`
   }
 
@@ -230,6 +235,7 @@ const DashboardContent: React.FC = () => {
 
             {/* Timer Display */}
             <TimerDisplay
+              hours={timerState === 'idle' ? 0 : hoursElapsedOrRemaining}
               minutes={
                 timerState === 'idle' && mode === 'pomodoro'
                   ? durations[selectedType]

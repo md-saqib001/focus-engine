@@ -279,6 +279,7 @@ export const useFocusSession = () => {
     mode: timer.mode,
     setMode,
     timerState: timer.state,
+    hoursElapsedOrRemaining: timer.hoursElapsedOrRemaining,
     minutesElapsedOrRemaining: timer.minutesElapsedOrRemaining,
     secondsElapsedOrRemaining: timer.secondsElapsedOrRemaining,
     progress: timer.progress,
