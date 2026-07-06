@@ -14,6 +14,7 @@ interface SessionRow {
   end_reason: string | null
   focus_score: number | null
   created_at: number
+  apps_killed?: number
 }
 
 const History: React.FC = () => {
@@ -67,9 +68,9 @@ const History: React.FC = () => {
   const formatEndReason = (reason: string | null): string => {
     if (reason === null) return '—'
     switch (reason) {
-      case 'auto_complete': return 'Auto ✓'
-      case 'manual_stop': return 'Stopped'
-      case 'abandoned': return 'Abandoned'
+      case 'auto_complete': return 'Completed Automatically'
+      case 'manual_stop': return 'Stopped Manually'
+      case 'abandoned': return 'Abandoned early'
       case 'force_ended': return 'Force Ended'
       default: return reason
     }
@@ -78,7 +79,7 @@ const History: React.FC = () => {
   const getEndReasonColor = (reason: string | null): string => {
     switch (reason) {
       case 'auto_complete': return '#10b981'
-      case 'manual_stop': return '#818cf8'
+      case 'manual_stop': return '#10b981' // Manual stop in standard counts as success
       case 'abandoned': return '#f59e0b'
       case 'force_ended': return '#ef4444'
       default: return '#64748b'
@@ -150,6 +151,7 @@ const History: React.FC = () => {
                   <th style={thStyle}>Mode</th>
                   <th style={thStyle}>Type</th>
                   <th style={thStyle}>Duration</th>
+                  <th style={thStyle}>Apps Killed</th>
                   <th style={thStyle}>Completed</th>
                   <th style={thStyle}>End Reason</th>
                 </tr>
@@ -183,12 +185,17 @@ const History: React.FC = () => {
                       {formatDuration(session.duration_actual_sec)}
                     </td>
                     <td style={tdStyle}>
-                      <span style={{ color: session.completed ? '#10b981' : '#f59e0b' }}>
+                      <span style={{ fontWeight: 600, color: (session.apps_killed ?? 0) > 0 ? '#818cf8' : '#64748b' }}>
+                        {session.apps_killed ?? 0}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ color: session.completed ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
                         {session.completed ? '✓ Yes' : '✗ No'}
                       </span>
                     </td>
                     <td style={tdStyle}>
-                      <span style={{ color: getEndReasonColor(session.end_reason) }}>
+                      <span style={{ color: getEndReasonColor(session.end_reason), fontWeight: 550 }}>
                         {formatEndReason(session.end_reason)}
                       </span>
                     </td>

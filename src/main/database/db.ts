@@ -43,23 +43,36 @@ export function getDatabase(): Database.Database {
     );
   `)
 
-  // Create blacklisted_apps table if it doesn't exist
+  // Check if we need to migrate/recreate blacklisted_apps table due to schema shift
+  try {
+    const columns = db.pragma("table_info(blacklisted_apps)") as { name: string }[]
+    if (columns.length > 0) {
+      const hasIsEnabled = columns.some((c) => c.name === 'is_enabled')
+      if (!hasIsEnabled) {
+        console.log('[DB] Outdated blacklisted_apps schema detected. Dropping old tables to recreate...')
+        db.exec('DROP TABLE IF EXISTS app_kill_events;')
+        db.exec('DROP TABLE IF EXISTS blacklisted_apps;')
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Failed schema verification check:', err)
+  }
+
+  // Create blacklisted_apps table with is_enabled column
   db.exec(`
     CREATE TABLE IF NOT EXISTS blacklisted_apps (
       app_name TEXT PRIMARY KEY,
-      enabled INTEGER NOT NULL DEFAULT 1,
-      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
+      is_enabled INTEGER DEFAULT 1
     );
   `)
 
-  // Create app_kill_events table if it doesn't exist
+  // Create app_kill_events table with AUTOINCREMENT and DATETIME defaults
   db.exec(`
     CREATE TABLE IF NOT EXISTS app_kill_events (
-      event_id TEXT PRIMARY KEY,
-      session_id TEXT,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
       app_name TEXT NOT NULL,
-      killed_at INTEGER NOT NULL,
-      FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+      killed_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
   `)
 
@@ -80,7 +93,7 @@ export function getDatabase(): Database.Database {
   const appCount = db.prepare('SELECT COUNT(*) as count FROM blacklisted_apps').get() as { count: number }
   if (appCount.count === 0) {
     console.log('[DB] Seeding default blacklisted apps...')
-    const insertStmt = db.prepare('INSERT INTO blacklisted_apps (app_name, enabled) VALUES (?, 1)')
+    const insertStmt = db.prepare('INSERT INTO blacklisted_apps (app_name, is_enabled) VALUES (?, 1)')
     const transaction = db.transaction((apps: string[]) => {
       for (const a of apps) {
         insertStmt.run(a)

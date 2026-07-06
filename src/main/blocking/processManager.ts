@@ -1,27 +1,20 @@
-import { exec } from 'child_process'
+import { execFile } from 'child_process'
 import { promisify } from 'util'
 import { basename } from 'path'
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 /**
  * Validates and sanitizes a process name to prevent shell command injection.
- * Reject metacharacters like $, ;, |, &, `, \n, \r, (, ), <, >, \
- * Only allow letters, numbers, spaces, dashes, underscores, and dots.
+ * Reject any characters that are not alphanumeric, hyphens, or underscores.
  */
 export function sanitizeProcessName(name: string): string {
   const clean = name.trim()
-  
-  // Shell command injection risk explicitly explained:
-  // When running exec(`taskkill /IM "${name}"`), if name contains metacharacters
-  // (e.g., 'spotify; rm -rf /' or 'discord & calc.exe'), the shell will interpret
-  // the metacharacter as a statement separator and execute the injected payload.
-  // By strictly checking name against a whitelist regex, we completely neutralize this vector.
-  const allowedPattern = /^[a-zA-Z0-9\s._-]+$/
+  const allowedPattern = /^[a-zA-Z0-9_-]+$/
   if (!allowedPattern.test(clean)) {
     throw new Error(
       `Invalid process name: "${name}". Process names may only contain ` +
-      `alphanumeric characters, spaces, dots, dashes, and underscores to prevent shell injection.`
+      `alphanumeric characters, hyphens, and underscores.`
     )
   }
   return clean
@@ -35,12 +28,10 @@ export async function getRunningProcesses(): Promise<string[]> {
 
   if (process.platform === 'win32') {
     try {
-      const { stdout } = await execAsync('tasklist /FO CSV /NH')
+      const { stdout } = await execFileAsync('tasklist', ['/FO', 'CSV', '/NH'])
       const lines = stdout.split(/\r?\n/)
       for (const line of lines) {
         if (!line.trim()) continue
-        // CSV format: "Process Name","PID","Session Name","Session#","Mem Usage"
-        // Splitting by "," and stripping quotes
         const match = line.split('","')
         if (match && match[0]) {
           const name = match[0].replace(/^"/, '').trim()
@@ -53,14 +44,12 @@ export async function getRunningProcesses(): Promise<string[]> {
       console.error('[ProcessManager] Failed to get running processes on Windows:', error)
     }
   } else {
-    // macOS / Linux
     try {
-      const { stdout } = await execAsync('ps -A -o comm')
+      const { stdout } = await execFileAsync('ps', ['-A', '-o', 'comm'])
       const lines = stdout.split(/\r?\n/)
       for (const line of lines) {
         const trimmed = line.trim()
         if (!trimmed || trimmed === 'COMM' || trimmed === 'command') continue
-        // Extract the base process name (e.g. /Applications/Discord.app/Contents/MacOS/Discord -> Discord)
         processes.push(basename(trimmed))
       }
     } catch (error) {
@@ -72,56 +61,62 @@ export async function getRunningProcesses(): Promise<string[]> {
 }
 
 /**
- * Terminates a process by its name.
+ * Terminates a process by its name using execFile to avoid command injection.
+ * Sanitizes input to allow only alphanumeric, hyphens, and underscores.
+ * Gracefully swallows exit codes 1 (pkill) and 128 (taskkill) representing process not found.
+ * Returns true if the process was terminated, false if not found.
  */
-export async function killProcess(name: string): Promise<void> {
-  const sanitized = sanitizeProcessName(name)
+export async function killProcess(appName: string): Promise<boolean> {
+  const cleanName = sanitizeProcessName(appName)
 
   if (process.platform === 'win32') {
-    // Ensure the name ends with .exe on Windows
-    const exeName = sanitized.toLowerCase().endsWith('.exe') ? sanitized : `${sanitized}.exe`
-    // /F = Force terminate, /T = Terminate tree (child processes)
-    await execAsync(`taskkill /F /T /IM "${exeName}"`)
+    const exeName = `${cleanName}.exe`
+    try {
+      await execFileAsync('taskkill', ['/F', '/IM', exeName])
+      return true
+    } catch (error: any) {
+      // Exit code 128 means process not found
+      if (error.code === 128 || (error.message && error.message.includes('not found'))) {
+        console.log(`[ProcessManager] process "${exeName}" was not running (swallowed taskkill exit code 128)`)
+        return false
+      }
+      throw error
+    }
   } else {
-    // macOS / Linux
-    // -f = full path match, -i = case-insensitive
-    await execAsync(`pkill -f -i "${sanitized}"`)
+    try {
+      await execFileAsync('pkill', ['-i', cleanName])
+      return true
+    } catch (error: any) {
+      // Exit code 1 means no processes matched
+      if (error.code === 1) {
+        console.log(`[ProcessManager] process "${cleanName}" was not running (swallowed pkill exit code 1)`)
+        return false
+      }
+      throw error
+    }
   }
 }
 
 /**
- * Scans active processes, terminates matches in the blacklisted apps list,
- * and returns details of what was killed.
+ * Loops through the given appNames, calls killProcess, and returns the result breakdown.
  */
-export async function killBlacklistedApps(blacklist: string[]): Promise<{
+export async function killBlacklistedApps(appNames: string[]): Promise<{
   killed: string[]
   notFound: string[]
 }> {
-  const running = await getRunningProcesses()
   const killed: string[] = []
   const notFound: string[] = []
 
-  // Optimize search by lowercasing running process list
-  const runningLower = running.map((p) => p.toLowerCase())
-
-  for (const app of blacklist) {
-    const appLower = app.toLowerCase()
-    
-    // Check if the app is currently running.
-    // Supports matching both exact name (Discord.exe) or base name (Discord).
-    const isRunning = runningLower.some((proc) => {
-      return proc === appLower || proc === `${appLower}.exe` || proc.includes(appLower)
-    })
-
-    if (isRunning) {
-      try {
-        await killProcess(app)
+  for (const app of appNames) {
+    try {
+      const wasKilled = await killProcess(app)
+      if (wasKilled) {
         killed.push(app)
-        console.log(`[ProcessManager] Terminated blacklisted app: ${app}`)
-      } catch (error) {
-        console.error(`[ProcessManager] Failed to kill ${app}:`, error)
+      } else {
+        notFound.push(app)
       }
-    } else {
+    } catch (error) {
+      console.error(`[ProcessManager] Failed to kill ${app}:`, error)
       notFound.push(app)
     }
   }

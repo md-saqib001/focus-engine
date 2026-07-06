@@ -6,7 +6,7 @@ import { getDatabase, closeDatabase } from './database/db'
 import { registerSessionHandlers } from './ipc/sessionHandlers'
 import { registerBlockingHandlers } from './ipc/blockingHandlers'
 import { registerAppBlockingHandlers } from './ipc/appBlockingHandlers'
-import { restoreHosts } from './blocking/hostsFileManager'
+import { restoreHostsSync } from './blocking/hostsFileManager'
 
 function createWindow(): void {
   // Create the browser window.
@@ -86,7 +86,7 @@ app.on('window-all-closed', () => {
 // Clean up database connection and restore hosts blocking on quit
 app.on('before-quit', () => {
   try {
-    restoreHosts()
+    restoreHostsSync()
   } catch (error) {
     console.error('Failed to restore hosts on shutdown:', error)
   }

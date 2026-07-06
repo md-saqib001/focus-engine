@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react'
 import { Card, TimerDisplay, Button } from '@/components/ui'
-import { useTimerEngine } from '../hooks/useTimerEngine'
-import { Play, Pause, Square, RotateCcw } from 'lucide-react'
+import { useFocusSessionContext } from '../context/FocusSessionContext'
+import ErrorBoundary from '../components/ErrorBoundary'
+import { Play, Pause, Square, RotateCcw, X, ShieldAlert, CheckCircle, AlertCircle } from 'lucide-react'
 import { SessionType } from '../types/timer'
 
-const Dashboard: React.FC = () => {
+const DashboardContent: React.FC = () => {
   const {
     mode,
     setMode,
-    state,
+    timerState,
     minutesElapsedOrRemaining,
     secondsElapsedOrRemaining,
     progress,
+    blockingStatus,
     blockingError,
-    startPomodoro,
-    startStandard,
-    pause,
-    resume,
-    stop,
-    reset
-  } = useTimerEngine()
+    appsKilled,
+    summary,
+    startPomodoroSession,
+    startStandardSession,
+    pauseSession,
+    resumeSession,
+    stopSession,
+    resetSession,
+    clearSummary
+  } = useFocusSessionContext()
 
   // Selected session type for Pomodoro mode (defaults to focus)
   const [selectedType, setSelectedType] = useState<SessionType>('focus')
@@ -33,21 +38,45 @@ const Dashboard: React.FC = () => {
 
   // Visual flash state when session completes
   const [flash, setFlash] = useState(false)
+  const [dismissWarning, setDismissWarning] = useState(false)
 
   useEffect(() => {
-    if (state === 'completed') {
+    if (timerState === 'completed') {
       setFlash(true)
       const timer = setTimeout(() => setFlash(false), 2000)
       return () => clearTimeout(timer)
     }
     return undefined
-  }, [state])
+  }, [timerState])
+
+  // Automatically reset dismiss state when a new session starts
+  useEffect(() => {
+    if (timerState === 'running') {
+      setDismissWarning(false)
+    }
+  }, [timerState])
 
   const handleStart = (): void => {
     if (mode === 'pomodoro') {
-      startPomodoro(selectedType, durations[selectedType])
+      startPomodoroSession(selectedType, durations[selectedType])
     } else {
-      startStandard()
+      startStandardSession()
+    }
+  }
+
+  const formatSummaryDuration = (sec: number): string => {
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    return `${m}m ${s}s`
+  }
+
+  const getPlainReason = (reason: string): string => {
+    switch (reason) {
+      case 'auto_complete': return 'Session completed automatically'
+      case 'manual_stop': return 'You stopped this session manually'
+      case 'abandoned': return 'Session was abandoned'
+      case 'force_ended': return 'Session was force ended'
+      default: return reason
     }
   }
 
@@ -68,7 +97,8 @@ const Dashboard: React.FC = () => {
         <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>Manage and monitor your active session.</p>
       </div>
 
-      {blockingError && (
+      {/* Dismissible Warning Banner on Blocking Error */}
+      {blockingError && !dismissWarning && (
         <div
           style={{
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -78,20 +108,47 @@ const Dashboard: React.FC = () => {
             color: '#fca5a5',
             fontSize: '13px',
             lineHeight: '1.6',
-            whiteSpace: 'pre-wrap'
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '16px'
           }}
         >
-          <strong>⚠️ Website Blocking Inactive:</strong>
-          <div style={{ marginTop: '4px' }}>{blockingError}</div>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+            <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>
+              <strong>⚠️ Web Blocking Error:</strong>
+              <div style={{ marginTop: '2px', opacity: 0.9 }}>{blockingError}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setDismissWarning(true)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fca5a5',
+              cursor: 'pointer',
+              padding: '2px',
+              borderRadius: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+          >
+            <X size={16} />
+          </button>
         </div>
       )}
 
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <Card title="Focus Session" style={{ width: '100%', maxWidth: '440px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
+        <Card title={mode === 'pomodoro' ? 'Pomodoro Session' : 'Standard Focus Session'} style={{ width: '100%', maxWidth: '460px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', padding: '12px 0' }}>
             
             {/* Mode Selector (Only visible when idle or completed) */}
-            {(state === 'idle' || state === 'completed') && (
+            {(timerState === 'idle' || timerState === 'completed') && (
               <div
                 style={{
                   display: 'flex',
@@ -105,7 +162,6 @@ const Dashboard: React.FC = () => {
                 <button
                   onClick={() => {
                     setMode('pomodoro')
-                    reset()
                   }}
                   style={{
                     flex: 1,
@@ -125,7 +181,6 @@ const Dashboard: React.FC = () => {
                 <button
                   onClick={() => {
                     setMode('standard')
-                    reset()
                   }}
                   style={{
                     flex: 1,
@@ -146,14 +201,13 @@ const Dashboard: React.FC = () => {
             )}
 
             {/* Pomodoro Session Type Selector (Only visible in pomodoro mode when idle/completed) */}
-            {mode === 'pomodoro' && (state === 'idle' || state === 'completed') && (
+            {mode === 'pomodoro' && (timerState === 'idle' || timerState === 'completed') && (
               <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
                 {(['focus', 'shortBreak', 'longBreak'] as SessionType[]).map((type) => (
                   <button
                     key={type}
                     onClick={() => {
                       setSelectedType(type)
-                      reset()
                     }}
                     style={{
                       flex: 1,
@@ -177,45 +231,94 @@ const Dashboard: React.FC = () => {
             {/* Timer Display */}
             <TimerDisplay
               minutes={
-                state === 'idle' && mode === 'pomodoro'
+                timerState === 'idle' && mode === 'pomodoro'
                   ? durations[selectedType]
                   : minutesElapsedOrRemaining
               }
-              seconds={state === 'idle' ? 0 : secondsElapsedOrRemaining}
-              state={state}
+              seconds={timerState === 'idle' ? 0 : secondsElapsedOrRemaining}
+              state={timerState}
               mode={mode}
               progress={progress}
             />
 
+            {/* Status Information Row (Active/Inactive blocking, Apps Killed) */}
+            {timerState !== 'idle' && timerState !== 'completed' && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-around',
+                  width: '100%',
+                  padding: '8px 12px',
+                  backgroundColor: '#0f0f17',
+                  borderRadius: '10px',
+                  border: '1px solid #1e1e2f',
+                  fontSize: '13px'
+                }}
+              >
+                {/* Blocking Status */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span
+                    style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        blockingStatus === 'blocking'
+                          ? '#10b981'
+                          : blockingStatus === 'error'
+                          ? '#ef4444'
+                          : '#64748b'
+                    }}
+                  />
+                  <span style={{ color: '#94a3b8' }}>
+                    Blocking:{' '}
+                    <strong style={{ color: blockingStatus === 'blocking' ? '#10b981' : blockingStatus === 'error' ? '#ef4444' : '#94a3b8' }}>
+                      {blockingStatus === 'blocking' ? 'Active' : blockingStatus === 'error' ? 'Error' : 'Inactive'}
+                    </strong>
+                  </span>
+                </div>
+
+                {/* Separator */}
+                <div style={{ borderLeft: '1px solid #232336' }} />
+
+                {/* Apps Killed Count */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
+                  <span>
+                    Apps Terminated: <strong style={{ color: appsKilled.length > 0 ? '#818cf8' : '#94a3b8' }}>{appsKilled.length}</strong>
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Controls */}
             <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
-              {state === 'idle' || state === 'completed' ? (
+              {timerState === 'idle' || timerState === 'completed' ? (
                 <Button variant="primary" size="md" onClick={handleStart} style={{ width: '160px' }}>
                   <Play size={16} fill="currentColor" />
                   <span>Start Session</span>
                 </Button>
               ) : (
                 <>
-                  {state === 'running' ? (
-                    <Button variant="secondary" size="md" onClick={pause}>
+                  {timerState === 'running' ? (
+                    <Button variant="secondary" size="md" onClick={pauseSession}>
                       <Pause size={16} fill="currentColor" />
                       <span>Pause</span>
                     </Button>
                   ) : (
-                    <Button variant="primary" size="md" onClick={resume}>
+                    <Button variant="primary" size="md" onClick={resumeSession}>
                       <Play size={16} fill="currentColor" />
                       <span>Resume</span>
                     </Button>
                   )}
 
-                  {/* Mode-Specific End Actions */}
+                  {/* Stop/End controls */}
                   {mode === 'pomodoro' ? (
-                    <Button variant="ghost" size="md" onClick={reset}>
+                    <Button variant="ghost" size="md" onClick={resetSession}>
                       <RotateCcw size={16} />
                       <span>Reset</span>
                     </Button>
                   ) : (
-                    <Button variant="danger" size="md" onClick={stop}>
+                    <Button variant="danger" size="md" onClick={stopSession}>
                       <Square size={16} fill="currentColor" />
                       <span>Stop</span>
                     </Button>
@@ -223,26 +326,148 @@ const Dashboard: React.FC = () => {
                 </>
               )}
             </div>
-
-            {/* Status notice when completed */}
-            {state === 'completed' && (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  color: '#10b981',
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  marginTop: '4px'
-                }}
-              >
-                <span>✓ Session Completed Successfully!</span>
-              </div>
-            )}
           </div>
         </Card>
       </div>
+
+      {/* Session Summary Modal */}
+      {summary && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 15, 23, 0.85)',
+            backdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#181824',
+              border: '1.5px solid #272738',
+              borderRadius: '20px',
+              padding: '28px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.4)',
+              color: '#f8fafc',
+              animation: 'modalSlideIn 0.3s ease-out'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {summary.completed ? (
+                  <CheckCircle size={22} style={{ color: '#10b981' }} />
+                ) : (
+                  <AlertCircle size={22} style={{ color: '#f59e0b' }} />
+                )}
+                <span>Session Summary</span>
+              </h2>
+              <button
+                onClick={clearSummary}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#64748b',
+                  cursor: 'pointer',
+                  padding: '4px',
+                  borderRadius: '6px',
+                  display: 'flex'
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#f8fafc')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = '#64748b')}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '28px' }}>
+              {/* Message */}
+              <div
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: '10px',
+                  backgroundColor: summary.completed ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.08)',
+                  borderLeft: `4px solid ${summary.completed ? '#10b981' : '#f59e0b'}`,
+                  fontSize: '14px',
+                  color: summary.completed ? '#a7f3d0' : '#fef3c7',
+                  fontWeight: 550
+                }}
+              >
+                {getPlainReason(summary.end_reason)}
+              </div>
+
+              {/* Grid details */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
+                <div style={{ padding: '10px', backgroundColor: '#0f0f17', borderRadius: '8px', border: '1px solid #1e1e2f' }}>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '4px' }}>Mode</span>
+                  <strong style={{ textTransform: 'capitalize', color: '#f8fafc' }}>{summary.session_mode}</strong>
+                </div>
+                <div style={{ padding: '10px', backgroundColor: '#0f0f17', borderRadius: '8px', border: '1px solid #1e1e2f' }}>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '4px' }}>Duration</span>
+                  <strong style={{ color: '#f8fafc' }}>{formatSummaryDuration(summary.duration_actual_sec)}</strong>
+                </div>
+              </div>
+
+              {/* Apps Killed */}
+              {summary.apps_killed.length > 0 && (
+                <div style={{ padding: '12px', backgroundColor: '#0f0f17', borderRadius: '8px', border: '1px solid #1e1e2f', fontSize: '13px' }}>
+                  <span style={{ color: '#64748b', display: 'block', marginBottom: '6px' }}>
+                    Terminated Applications ({summary.apps_killed.length})
+                  </span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                    {summary.apps_killed.map((app) => (
+                      <span
+                        key={app}
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(129, 140, 248, 0.12)',
+                          color: '#818cf8',
+                          border: '1px solid rgba(129, 140, 248, 0.2)'
+                        }}
+                      >
+                        {app}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Summary Buttons */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+              <Button variant="secondary" size="md" onClick={clearSummary}>
+                Close
+              </Button>
+
+              {/* Start Break is only visible if the completed session was a Pomodoro focus session */}
+              {summary.session_mode === 'pomodoro' && summary.session_type === 'focus' && summary.completed && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  onClick={() => {
+                    clearSummary()
+                    // Auto select Short Break and start
+                    setSelectedType('shortBreak')
+                    startPomodoroSession('shortBreak', durations.shortBreak)
+                  }}
+                >
+                  Start Break (5m)
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes flashEffect {
@@ -250,8 +475,20 @@ const Dashboard: React.FC = () => {
           50% { background-color: rgba(129, 140, 248, 0.15); }
           100% { background-color: #0f0f17; }
         }
+        @keyframes modalSlideIn {
+          from { transform: translateY(20px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
       `}</style>
     </div>
+  )
+}
+
+const Dashboard: React.FC = () => {
+  return (
+    <ErrorBoundary>
+      <DashboardContent />
+    </ErrorBoundary>
   )
 }
 

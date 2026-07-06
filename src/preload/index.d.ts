@@ -44,8 +44,7 @@ interface BlockedDomainRow {
 
 interface BlacklistedAppRow {
   app_name: string
-  enabled: number // 0 or 1
-  created_at: number
+  is_enabled: number // 0 or 1
 }
 
 interface IPCResult<T = unknown> {

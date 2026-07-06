@@ -10,22 +10,18 @@ interface BlockedDomainRow {
 
 interface BlacklistedAppRow {
   app_name: string
-  enabled: number // 0 or 1
-  created_at: number
+  is_enabled: number // 0 or 1
 }
 
 const Settings: React.FC = () => {
   // Domain blocking states
   const [domains, setDomains] = useState<BlockedDomainRow[]>([])
   const [newDomain, setNewDomain] = useState('')
-  const [active, setActive] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
   // App blocking states
   const [apps, setApps] = useState<BlacklistedAppRow[]>([])
   const [newApp, setNewApp] = useState('')
-  const [killLogs, setKillLogs] = useState<string[]>([])
-  const [appActive, setAppActive] = useState(false)
   const [loading, setLoading] = useState(true)
 
   const fetchDomains = async (): Promise<void> => {
@@ -36,17 +32,6 @@ const Settings: React.FC = () => {
       }
     } catch (err) {
       console.error('[Settings] Get domains error:', err)
-    }
-  }
-
-  const checkStatus = async (): Promise<void> => {
-    try {
-      const res = await window.focusEngineAPI.isBlockingActive()
-      if (res.success && res.data !== undefined) {
-        setActive(res.data)
-      }
-    } catch (err) {
-      console.error('[Settings] Status error:', err)
     }
   }
 
@@ -64,39 +49,11 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const init = async (): Promise<void> => {
       setLoading(true)
-      await Promise.all([fetchDomains(), checkStatus(), fetchApps()])
+      await Promise.all([fetchDomains(), fetchApps()])
       setLoading(false)
     }
     init()
   }, [])
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null
-
-    const runKillCheck = async () => {
-      try {
-        const res = await window.focusEngineAPI.killBlacklistedApps('settings_manual_test')
-        if (res.success && res.data && res.data.length > 0) {
-          setKillLogs((prev) => {
-            const timestamp = new Date().toLocaleTimeString()
-            const newLogs = res.data!.map((app) => `[${timestamp}] ✓ Terminated: ${app}`)
-            return [...newLogs, ...prev].slice(0, 15) // Keep last 15 log entries
-          })
-        }
-      } catch (err) {
-        console.error('[Settings] Background kill test error:', err)
-      }
-    }
-
-    if (appActive) {
-      runKillCheck()
-      interval = setInterval(runKillCheck, 1500)
-    }
-
-    return () => {
-      if (interval) clearInterval(interval)
-    }
-  }, [appActive])
 
   const handleAddDomain = async (e: React.FormEvent): Promise<void> => {
     e.preventDefault()
@@ -114,9 +71,6 @@ const Settings: React.FC = () => {
       if (res.success) {
         setNewDomain('')
         await fetchDomains()
-        if (active) {
-          await window.focusEngineAPI.startBlocking()
-        }
       } else {
         setError(res.error || 'Failed to add domain')
       }
@@ -131,9 +85,6 @@ const Settings: React.FC = () => {
       const res = await window.focusEngineAPI.removeBlockedDomain(domainName)
       if (res.success) {
         await fetchDomains()
-        if (active) {
-          await window.focusEngineAPI.startBlocking()
-        }
       } else {
         setError(res.error || 'Failed to remove domain')
       }
@@ -148,34 +99,8 @@ const Settings: React.FC = () => {
       const res = await window.focusEngineAPI.toggleBlockedDomain(domainName, !currentlyEnabled)
       if (res.success) {
         await fetchDomains()
-        if (active) {
-          await window.focusEngineAPI.startBlocking()
-        }
       } else {
         setError(res.error || 'Failed to toggle domain')
-      }
-    } catch (err: any) {
-      setError(err.message || String(err))
-    }
-  }
-
-  const handleToggleTestBlocking = async (): Promise<void> => {
-    setError(null)
-    try {
-      if (active) {
-        const res = await window.focusEngineAPI.stopBlocking()
-        if (res.success) {
-          setActive(false)
-        } else {
-          setError(res.error || 'Failed to stop blocking')
-        }
-      } else {
-        const res = await window.focusEngineAPI.startBlocking()
-        if (res.success) {
-          setActive(true)
-        } else {
-          setError(res.error || 'Failed to start blocking')
-        }
       }
     } catch (err: any) {
       setError(err.message || String(err))
@@ -230,12 +155,6 @@ const Settings: React.FC = () => {
     }
   }
 
-  const handleToggleTestAppBlocking = (): void => {
-    setError(null)
-    setKillLogs([])
-    setAppActive((prev) => !prev)
-  }
-
   return (
     <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px', maxWidth: '800px', margin: '0 auto' }}>
       <div>
@@ -263,42 +182,6 @@ const Settings: React.FC = () => {
           <div>{error}</div>
         </div>
       )}
-
-      {/* Manual Blocking Test Control */}
-      <Card title="Hosts File Blocking Test">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '8px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    backgroundColor: active ? '#10b981' : '#64748b'
-                  }}
-                />
-                <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '15px' }}>
-                  Blocking Status: {active ? 'ACTIVE' : 'INACTIVE'}
-                </span>
-              </div>
-              <p style={{ color: '#64748b', fontSize: '13px', margin: '6px 0 0 0', lineHeight: '1.5' }}>
-                Website blocking updates your system's hosts file to redirect distraction sites. 
-                Running a test manually updates this system file.
-              </p>
-            </div>
-            <Button
-              variant={active ? 'danger' : 'primary'}
-              size="md"
-              onClick={handleToggleTestBlocking}
-              style={{ minWidth: '160px' }}
-            >
-              {active ? 'Stop Test' : 'Test Blocking Now'}
-            </Button>
-          </div>
-        </div>
-      </Card>
 
       {/* Domain Blocking Manager */}
       <Card title="Blocked Domains List">
@@ -421,54 +304,9 @@ const Settings: React.FC = () => {
       {/* Blacklisted Apps Manager */}
       <Card title="Blacklisted Applications">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '8px 0' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: '10px',
-                    height: '10px',
-                    borderRadius: '50%',
-                    backgroundColor: appActive ? '#10b981' : '#64748b'
-                  }}
-                />
-                <span style={{ fontWeight: 600, color: '#f8fafc', fontSize: '15px' }}>
-                  App Termination Test: {appActive ? 'ACTIVE' : 'INACTIVE'}
-                </span>
-              </div>
-              <p style={{ color: '#64748b', fontSize: '13px', margin: '6px 0 0 0', lineHeight: '1.5', maxWidth: '480px' }}>
-                These applications will be terminated automatically when a focus session starts to prevent distraction.
-                Toggling the test mode will continuously close target applications every 1.5 seconds.
-              </p>
-            </div>
-            <Button
-              variant={appActive ? 'danger' : 'primary'}
-              size="md"
-              onClick={handleToggleTestAppBlocking}
-              style={{ minWidth: '160px' }}
-            >
-              {appActive ? 'Stop Test' : 'Test App Blocking'}
-            </Button>
-          </div>
-
-          {killLogs.length > 0 && (
-            <div
-              style={{
-                backgroundColor: '#0a0a0f',
-                border: '1px solid #232336',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                fontFamily: 'monospace',
-                fontSize: '12px',
-                color: '#10b981'
-              }}
-            >
-              {killLogs.map((log, index) => (
-                <div key={index}>{log}</div>
-              ))}
-            </div>
-          )}
+          <p style={{ color: '#64748b', fontSize: '13px', margin: '0', lineHeight: '1.5' }}>
+            These applications will be terminated automatically and periodically during active focus sessions to prevent distraction.
+          </p>
 
           <form onSubmit={handleAddApp} style={{ display: 'flex', gap: '12px' }}>
             <input
@@ -505,7 +343,7 @@ const Settings: React.FC = () => {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {apps.map((row) => {
-                const isEnabled = row.enabled === 1
+                const isEnabled = row.is_enabled === 1
                 return (
                   <div
                     key={row.app_name}

@@ -24,8 +24,11 @@ export async function backupHosts(): Promise<void> {
   const hostsPath = getHostsPath()
   const backupPath = getBackupPath()
 
-  if (fs.existsSync(backupPath)) {
+  try {
+    await fs.promises.access(backupPath)
     return // Backup already exists
+  } catch {
+    // File doesn't exist, proceed to create backup
   }
 
   try {
@@ -109,7 +112,11 @@ export async function blockDomains(domains: string[]): Promise<void> {
 export async function restoreHosts(): Promise<void> {
   const hostsPath = getHostsPath()
   try {
-    if (!fs.existsSync(hostsPath)) return
+    try {
+      await fs.promises.access(hostsPath)
+    } catch {
+      return // Hosts file doesn't exist
+    }
     const content = await fs.promises.readFile(hostsPath, 'utf8')
     if (!content.includes(BLOCK_START_MARKER)) return // Nothing to restore
 
@@ -118,6 +125,26 @@ export async function restoreHosts(): Promise<void> {
     console.log('[HostsManager] Web blocking deactivated. Hosts restored.')
   } catch (error: any) {
     console.error('[HostsManager] Failed to restore hosts file:', error)
+  }
+}
+
+/**
+ * Synchronous version of restoreHosts for use in shutdown paths (before-quit)
+ * where async operations cannot be awaited. Uses fs.readFileSync/writeFileSync
+ * intentionally — blocking is acceptable during app shutdown.
+ */
+export function restoreHostsSync(): void {
+  const hostsPath = getHostsPath()
+  try {
+    if (!fs.existsSync(hostsPath)) return
+    const content = fs.readFileSync(hostsPath, 'utf8')
+    if (!content.includes(BLOCK_START_MARKER)) return
+
+    const cleaned = stripBlockingBlock(content)
+    fs.writeFileSync(hostsPath, cleaned, 'utf8')
+    console.log('[HostsManager] Web blocking deactivated (sync shutdown). Hosts restored.')
+  } catch (error: any) {
+    console.error('[HostsManager] Failed to restore hosts file on shutdown:', error)
   }
 }
 

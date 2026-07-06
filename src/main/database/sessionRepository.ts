@@ -12,6 +12,7 @@ export interface SessionRow {
   end_reason: string | null
   focus_score: number | null
   created_at: number
+  apps_killed?: number
 }
 
 /**
@@ -117,7 +118,13 @@ export function saveSession(params: {
  */
 export function getAllSessions(): SessionRow[] {
   const db = getDatabase()
-  const stmt = db.prepare(`SELECT * FROM sessions ORDER BY start_time DESC`)
+  const stmt = db.prepare(`
+    SELECT s.*, COUNT(e.id) as apps_killed
+    FROM sessions s
+    LEFT JOIN app_kill_events e ON s.session_id = e.session_id
+    GROUP BY s.session_id
+    ORDER BY s.start_time DESC
+  `)
   return stmt.all() as SessionRow[]
 }
 

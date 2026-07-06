@@ -1,16 +1,13 @@
 import { ipcMain } from 'electron'
 import {
   getAllBlacklistedApps,
-  getEnabledBlacklistedApps,
+  getEnabledApps,
   addBlacklistedApp,
   removeBlacklistedApp,
-  logAppKillEvent
+  toggleBlacklistedApp,
+  logKillEvent
 } from '../database/blacklistedAppsRepository'
 import { killBlacklistedApps } from '../blocking/processManager'
-
-// Wait, let's make sure we imported the right name.
-// It is toggleBlacklistedApp in the repo! Let's check: yes.
-import { toggleBlacklistedApp } from '../database/blacklistedAppsRepository'
 
 export function registerAppBlockingHandlers(): void {
   // Terminate active blacklisted apps and log events to SQLite
@@ -18,12 +15,12 @@ export function registerAppBlockingHandlers(): void {
     'appBlocking:killBlacklisted',
     async (_event, args: { sessionId: string }) => {
       try {
-        const blacklist = getEnabledBlacklistedApps()
+        const blacklist = getEnabledApps()
         const { killed } = await killBlacklistedApps(blacklist)
         
         // Log each process termination event
         for (const app of killed) {
-          logAppKillEvent(args.sessionId, app)
+          logKillEvent(args.sessionId, app)
         }
         
         return { success: true, data: killed }

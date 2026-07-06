@@ -5,7 +5,6 @@ export const useTimerEngine = () => {
   const [mode, setMode] = useState<SessionMode>('pomodoro')
   const [state, setState] = useState<TimerState>('idle')
   const [sessionType, setSessionType] = useState<SessionType | null>(null)
-  const [blockingError, setBlockingError] = useState<string | null>(null)
   
   // Holds current remaining seconds (pomodoro) or elapsed seconds (standard)
   const [time, setTime] = useState<number>(0)
@@ -13,16 +12,13 @@ export const useTimerEngine = () => {
   // Total duration of the current pomodoro session
   const [totalDurationSeconds, setTotalDurationSeconds] = useState<number>(0)
 
+  // Track the actual start timestamp of the entire session (uses state to prevent stale reads)
+  const [sessionStartTime, setSessionStartTime] = useState<number>(0)
+
   // Anchor refs to track precise elapsed duration against CPU throttling
   const startTimeRef = useRef<number>(0)
   const accumulatedSecondsRef = useRef<number>(0)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
-
-  // Track the actual start timestamp of the entire session (set once on start)
-  const sessionStartTimeRef = useRef<number>(0)
-
-  // Track a pre-generated session ID to link app termination events
-  const sessionIdRef = useRef<string>('')
 
   // Clear interval helper
   const clearIntervalRef = useCallback(() => {
@@ -54,107 +50,58 @@ export const useTimerEngine = () => {
         clearIntervalRef()
         setTime(0)
         setState('completed')
-        
-        // Stop website blocking
-        if (sessionType === 'focus') {
-          window.focusEngineAPI.stopBlocking().catch((err) => console.error('[useTimerEngine] stopBlocking failed:', err))
-        }
-
-        // Write finalized Pomodoro session to SQLite
-        if (sessionType) {
-          window.focusEngineAPI.saveSession({
-            sessionId: sessionIdRef.current,
-            mode: 'pomodoro',
-            sessionType,
-            startTime: sessionStartTimeRef.current,
-            endTime: Date.now(),
-            durationPlannedSec: totalDurationSeconds,
-            durationActualSec: totalDurationSeconds,
-            completed: true,
-            endReason: 'auto_complete'
-          }).catch((err) => console.error('[useTimerEngine] Save failed:', err))
-        }
       } else {
         setTime(remaining)
       }
     } else {
       setTime(totalElapsedSeconds)
     }
-  }, [mode, totalDurationSeconds, sessionType, clearIntervalRef, getElapsedSeconds])
+  }, [mode, totalDurationSeconds, clearIntervalRef, getElapsedSeconds])
+
+  // Latest callback ref pattern to avoid stale closures in setInterval
+  const tickRef = useRef<() => void>(tick)
+  useEffect(() => {
+    tickRef.current = tick
+  }, [tick])
 
   // Start standard mode (stopwatch)
-  const startStandard = useCallback(async () => {
+  const startStandard = useCallback(() => {
     clearIntervalRef()
     setMode('standard')
     setSessionType(null)
     setState('running')
-    setBlockingError(null)
     
     const now = Date.now()
-    sessionStartTimeRef.current = now
+    setSessionStartTime(now)
     startTimeRef.current = now
     accumulatedSecondsRef.current = 0
     setTime(0)
     setTotalDurationSeconds(0)
 
-    // Pre-generate session ID to link logged app kill events
-    sessionIdRef.current = crypto.randomUUID()
-
-    // Trigger website blocking for standard focus session
-    try {
-      const res = await window.focusEngineAPI.startBlocking()
-      if (!res.success && res.error) {
-        setBlockingError(res.error)
-      }
-    } catch (err: any) {
-      setBlockingError(err.message || String(err))
-    }
-
-    // Trigger blacklisted apps termination immediately
-    window.focusEngineAPI.killBlacklistedApps(sessionIdRef.current).catch((err) => {
-      console.error('[useTimerEngine] App blocking failed:', err)
-    })
-
-    intervalRef.current = setInterval(tick, 200)
-  }, [clearIntervalRef, tick])
+    intervalRef.current = setInterval(() => {
+      tickRef.current()
+    }, 200)
+  }, [clearIntervalRef])
 
   // Start pomodoro mode (countdown)
-  const startPomodoro = useCallback(async (type: SessionType, durationMinutes: number) => {
+  const startPomodoro = useCallback((type: SessionType, durationMinutes: number) => {
     clearIntervalRef()
     setMode('pomodoro')
     setSessionType(type)
     setState('running')
-    setBlockingError(null)
     
     const durationSeconds = durationMinutes * 60
     const now = Date.now()
-    sessionStartTimeRef.current = now
+    setSessionStartTime(now)
     startTimeRef.current = now
     accumulatedSecondsRef.current = 0
     setTime(durationSeconds)
     setTotalDurationSeconds(durationSeconds)
 
-    // Pre-generate session ID
-    sessionIdRef.current = crypto.randomUUID()
-
-    // Trigger website blocking and app termination ONLY if this is a focus session (not a break)
-    if (type === 'focus') {
-      try {
-        const res = await window.focusEngineAPI.startBlocking()
-        if (!res.success && res.error) {
-          setBlockingError(res.error)
-        }
-      } catch (err: any) {
-        setBlockingError(err.message || String(err))
-      }
-
-      window.focusEngineAPI.killBlacklistedApps(sessionIdRef.current).catch((err) => {
-        console.error('[useTimerEngine] App blocking failed:', err)
-      })
-    }
-
-    intervalRef.current = setInterval(tick, 200)
-  }, [clearIntervalRef, tick])
+    intervalRef.current = setInterval(() => {
+      tickRef.current()
+    }, 200)
+  }, [clearIntervalRef])
 
   // Pause session
   const pause = useCallback(() => {
@@ -174,87 +121,32 @@ export const useTimerEngine = () => {
     setState('running')
 
     startTimeRef.current = Date.now()
-    intervalRef.current = setInterval(tick, 200)
-  }, [state, clearIntervalRef, tick])
+    intervalRef.current = setInterval(() => {
+      tickRef.current()
+    }, 200)
+  }, [state, clearIntervalRef])
 
-  // Manual end / Stop session — standard mode only
+  // Manual end / Stop session
   const stop = useCallback(() => {
     clearIntervalRef()
-    const actualDuration = getElapsedSeconds()
     setState('completed')
+  }, [clearIntervalRef])
 
-    // Stop website blocking
-    window.focusEngineAPI.stopBlocking().catch((err) => console.error('[useTimerEngine] stopBlocking failed:', err))
-
-    // Save finalized Standard session to SQLite
-    window.focusEngineAPI.saveSession({
-      sessionId: sessionIdRef.current,
-      mode: 'standard',
-      startTime: sessionStartTimeRef.current,
-      endTime: Date.now(),
-      durationActualSec: actualDuration,
-      completed: true,
-      endReason: 'manual_stop'
-    }).catch((err) => console.error('[useTimerEngine] Save failed:', err))
-  }, [clearIntervalRef, getElapsedSeconds])
-
-  // Reset / Abort session — pomodoro only
+  // Reset / Abort session
   const reset = useCallback(() => {
     clearIntervalRef()
-    const actualDuration = getElapsedSeconds()
-
-    // Stop website blocking
-    if (sessionType === 'focus') {
-      window.focusEngineAPI.stopBlocking().catch((err) => console.error('[useTimerEngine] stopBlocking failed:', err))
-    }
-
-    // If a pomodoro session was active/paused, save it as abandoned
-    if (mode === 'pomodoro' && (state === 'running' || state === 'paused') && sessionType) {
-      window.focusEngineAPI.saveSession({
-        sessionId: sessionIdRef.current,
-        mode: 'pomodoro',
-        sessionType,
-        startTime: sessionStartTimeRef.current,
-        endTime: Date.now(),
-        durationPlannedSec: totalDurationSeconds,
-        durationActualSec: actualDuration,
-        completed: false,
-        endReason: 'abandoned'
-      }).catch((err) => console.error('[useTimerEngine] Save failed:', err))
-    }
-
     setState('idle')
     setTime(0)
     setTotalDurationSeconds(0)
     accumulatedSecondsRef.current = 0
     startTimeRef.current = 0
-    sessionStartTimeRef.current = 0
-    sessionIdRef.current = ''
-    setBlockingError(null)
-  }, [mode, state, sessionType, totalDurationSeconds, clearIntervalRef, getElapsedSeconds])
+    setSessionStartTime(0)
+  }, [clearIntervalRef])
 
-  // TODO Phase 4: buffer engine distraction trigger
-  const forceEnd = useCallback((reason: string) => {
-    console.warn(`Session force-ended: ${reason}`)
+  const forceEnd = useCallback(() => {
     clearIntervalRef()
-    const actualDuration = getElapsedSeconds()
     setState('completed')
-
-    // Stop website blocking
-    window.focusEngineAPI.stopBlocking().catch((err) => console.error('[useTimerEngine] stopBlocking failed:', err))
-
-    if (mode === 'standard') {
-      window.focusEngineAPI.saveSession({
-        sessionId: sessionIdRef.current,
-        mode: 'standard',
-        startTime: sessionStartTimeRef.current,
-        endTime: Date.now(),
-        durationActualSec: actualDuration,
-        completed: false,
-        endReason: 'force_ended'
-      }).catch((err) => console.error('[useTimerEngine] Save failed:', err))
-    }
-  }, [mode, clearIntervalRef, getElapsedSeconds])
+  }, [clearIntervalRef])
 
   // Minutes and seconds elapsed or remaining
   const minutes = Math.floor(time / 60)
@@ -272,13 +164,15 @@ export const useTimerEngine = () => {
     minutesElapsedOrRemaining: minutes,
     secondsElapsedOrRemaining: seconds,
     progress,
-    blockingError,
     startPomodoro,
     startStandard,
     pause,
     resume,
     stop,
     reset,
-    forceEnd
+    forceEnd,
+    getElapsedSeconds,
+    sessionStartTime,
+    totalDurationSeconds
   }
 }

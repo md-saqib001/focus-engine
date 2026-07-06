@@ -1,17 +1,8 @@
 import { getDatabase } from './db'
-import { randomUUID } from 'crypto'
 
 export interface BlacklistedAppRow {
   app_name: string
-  enabled: number // 0 or 1
-  created_at: number
-}
-
-export interface AppKillEventRow {
-  event_id: string
-  session_id: string
-  app_name: string
-  killed_at: number
+  is_enabled: number // 0 or 1
 }
 
 /**
@@ -19,15 +10,15 @@ export interface AppKillEventRow {
  */
 export function getAllBlacklistedApps(): BlacklistedAppRow[] {
   const db = getDatabase()
-  return db.prepare('SELECT * FROM blacklisted_apps ORDER BY created_at DESC').all() as BlacklistedAppRow[]
+  return db.prepare('SELECT app_name, is_enabled FROM blacklisted_apps').all() as BlacklistedAppRow[]
 }
 
 /**
  * Returns names of all enabled blacklisted apps.
  */
-export function getEnabledBlacklistedApps(): string[] {
+export function getEnabledApps(): string[] {
   const db = getDatabase()
-  const rows = db.prepare('SELECT app_name FROM blacklisted_apps WHERE enabled = 1').all() as { app_name: string }[]
+  const rows = db.prepare('SELECT app_name FROM blacklisted_apps WHERE is_enabled = 1').all() as { app_name: string }[]
   return rows.map((r) => r.app_name)
 }
 
@@ -41,7 +32,7 @@ export function addBlacklistedApp(appName: string): void {
   }
 
   const db = getDatabase()
-  db.prepare('INSERT OR IGNORE INTO blacklisted_apps (app_name, enabled) VALUES (?, 1)').run(cleanName)
+  db.prepare('INSERT OR IGNORE INTO blacklisted_apps (app_name, is_enabled) VALUES (?, 1)').run(cleanName)
 }
 
 /**
@@ -57,7 +48,7 @@ export function removeBlacklistedApp(appName: string): void {
  */
 export function toggleBlacklistedApp(appName: string, enabled: boolean): void {
   const db = getDatabase()
-  db.prepare('UPDATE blacklisted_apps SET enabled = ? WHERE app_name = ?').run(
+  db.prepare('UPDATE blacklisted_apps SET is_enabled = ? WHERE app_name = ?').run(
     enabled ? 1 : 0,
     appName.trim()
   )
@@ -66,13 +57,10 @@ export function toggleBlacklistedApp(appName: string, enabled: boolean): void {
 /**
  * Logs a process termination event to app_kill_events.
  */
-export function logAppKillEvent(sessionId: string, appName: string): void {
+export function logKillEvent(sessionId: string, appName: string): void {
   const db = getDatabase()
-  const eventId = randomUUID()
-  const now = Date.now()
-
   db.prepare(`
-    INSERT INTO app_kill_events (event_id, session_id, app_name, killed_at)
-    VALUES (?, ?, ?, ?)
-  `).run(eventId, sessionId, appName, now)
+    INSERT INTO app_kill_events (session_id, app_name)
+    VALUES (?, ?)
+  `).run(sessionId, appName)
 }
