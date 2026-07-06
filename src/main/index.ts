@@ -4,6 +4,8 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { getDatabase, closeDatabase } from './database/db'
 import { registerSessionHandlers } from './ipc/sessionHandlers'
+import { registerBlockingHandlers } from './ipc/blockingHandlers'
+import { restoreHosts } from './blocking/hostsFileManager'
 
 function createWindow(): void {
   // Create the browser window.
@@ -59,6 +61,7 @@ app.whenReady().then(() => {
 
   // Register all IPC handlers
   registerSessionHandlers()
+  registerBlockingHandlers()
 
   createWindow()
 
@@ -78,8 +81,13 @@ app.on('window-all-closed', () => {
   }
 })
 
-// Clean up database connection on quit
+// Clean up database connection and restore hosts blocking on quit
 app.on('before-quit', () => {
+  try {
+    restoreHosts()
+  } catch (error) {
+    console.error('Failed to restore hosts on shutdown:', error)
+  }
   closeDatabase()
 })
 

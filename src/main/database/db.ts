@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
+import { DEFAULT_BLOCKED_DOMAINS } from '../blocking/blockedDomainsList'
 
 let db: Database.Database | null = null
 
@@ -32,30 +33,28 @@ export function getDatabase(): Database.Database {
     );
   `)
 
-  /*
-   * session_type is NULLABLE by design:
-   *   Pomodoro sessions have a type ('focus' | 'shortBreak' | 'longBreak').
-   *   Standard sessions are open-ended and do not have a type — they are
-   *   simply "focus work" without a predefined structure. Setting this to
-   *   NULL for standard rows avoids inventing a meaningless label.
-   *
-   * duration_planned_sec is NULLABLE by design:
-   *   Pomodoro sessions always have a planned duration (e.g. 1500s for 25min).
-   *   Standard sessions are open-ended with no target duration — storing NULL
-   *   correctly represents "there was no plan" vs storing 0 which would
-   *   incorrectly imply "planned for zero seconds".
-   *
-   * end_reason tracks HOW the session ended:
-   *   'auto_complete' — pomodoro countdown reached 0:00
-   *   'manual_stop'   — user clicked Stop (primary way standard sessions end)
-   *   'abandoned'     — user reset/aborted before completion
-   *   'force_ended'   — Phase 4 buffer engine detected sustained distraction
-   *                      (reserved value, not reachable yet)
-   *
-   * This is a fresh schema on Day 4. No existing data needs migration.
-   * The nullability of session_type and duration_planned_sec does not break
-   * any prior constraints because no rows exist yet.
-   */
+  // Create blocked_domains table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS blocked_domains (
+      domain TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
+    );
+  `)
+
+  // Seed blocked_domains if empty
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM blocked_domains').get() as { count: number }
+  if (countRow.count === 0) {
+    console.log('[DB] Seeding default blocked domains...')
+    const insertStmt = db.prepare('INSERT INTO blocked_domains (domain, enabled) VALUES (?, 1)')
+    // Seed using a transaction for efficiency
+    const transaction = db.transaction((domains: string[]) => {
+      for (const d of domains) {
+        insertStmt.run(d)
+      }
+    })
+    transaction(DEFAULT_BLOCKED_DOMAINS)
+  }
 
   console.log('[DB] Database initialized, schema ready')
   return db

@@ -34,6 +34,12 @@ interface SessionRow {
   created_at: number
 }
 
+interface BlockedDomainRow {
+  domain: string
+  enabled: number // 0 or 1
+  created_at: number
+}
+
 interface IPCResult<T = unknown> {
   success: boolean
   data?: T
@@ -43,6 +49,15 @@ interface IPCResult<T = unknown> {
 interface FocusEngineAPI {
   saveSession: (args: SaveSessionArgs) => Promise<IPCResult<SessionRow>>
   getAllSessions: () => Promise<IPCResult<SessionRow[]>>
+
+  // Hosts blocking endpoints
+  startBlocking: () => Promise<IPCResult<void>>
+  stopBlocking: () => Promise<IPCResult<void>>
+  isBlockingActive: () => Promise<IPCResult<boolean>>
+  getBlockedDomains: () => Promise<IPCResult<BlockedDomainRow[]>>
+  addBlockedDomain: (domain: string) => Promise<IPCResult<void>>
+  removeBlockedDomain: (domain: string) => Promise<IPCResult<void>>
+  toggleBlockedDomain: (domain: string, enabled: boolean) => Promise<IPCResult<void>>
 }
 
 declare global {

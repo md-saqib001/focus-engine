@@ -12,6 +12,7 @@ const Dashboard: React.FC = () => {
     minutesElapsedOrRemaining,
     secondsElapsedOrRemaining,
     progress,
+    blockingError,
     startPomodoro,
     startStandard,
     pause,
@@ -66,6 +67,24 @@ const Dashboard: React.FC = () => {
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc', margin: '0 0 4px 0' }}>Dashboard</h1>
         <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>Manage and monitor your active session.</p>
       </div>
+
+      {blockingError && (
+        <div
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            border: '1.5px dashed #ef4444',
+            borderRadius: '12px',
+            padding: '16px',
+            color: '#fca5a5',
+            fontSize: '13px',
+            lineHeight: '1.6',
+            whiteSpace: 'pre-wrap'
+          }}
+        >
+          <strong>⚠️ Website Blocking Inactive:</strong>
+          <div style={{ marginTop: '4px' }}>{blockingError}</div>
+        </div>
+      )}
 
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <Card title="Focus Session" style={{ width: '100%', maxWidth: '440px' }}>

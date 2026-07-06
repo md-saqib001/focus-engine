@@ -51,6 +51,35 @@ const focusEngineAPI = {
 
   getAllSessions: () => {
     return ipcRenderer.invoke('session:getAll')
+  },
+
+  // Hosts blocking endpoints
+  startBlocking: () => {
+    return ipcRenderer.invoke('blocking:start')
+  },
+
+  stopBlocking: () => {
+    return ipcRenderer.invoke('blocking:stop')
+  },
+
+  isBlockingActive: () => {
+    return ipcRenderer.invoke('blocking:status')
+  },
+
+  getBlockedDomains: () => {
+    return ipcRenderer.invoke('blocking:getDomains')
+  },
+
+  addBlockedDomain: (domain: string) => {
+    return ipcRenderer.invoke('blocking:addDomain', domain)
+  },
+
+  removeBlockedDomain: (domain: string) => {
+    return ipcRenderer.invoke('blocking:removeDomain', domain)
+  },
+
+  toggleBlockedDomain: (domain: string, enabled: boolean) => {
+    return ipcRenderer.invoke('blocking:toggleDomain', { domain, enabled })
   }
 }
 
