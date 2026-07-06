@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 
 type SaveSessionArgs =
   | {
+      sessionId: string
       mode: 'pomodoro'
       sessionType: 'focus' | 'shortBreak' | 'longBreak'
       startTime: number
@@ -13,6 +14,7 @@ type SaveSessionArgs =
       endReason: 'auto_complete' | 'abandoned'
     }
   | {
+      sessionId: string
       mode: 'standard'
       startTime: number
       endTime: number
@@ -26,6 +28,7 @@ const focusEngineAPI = {
   saveSession: (args: SaveSessionArgs) => {
     if (args.mode === 'pomodoro') {
       return ipcRenderer.invoke('session:save', {
+        sessionId: args.sessionId,
         mode: args.mode,
         sessionType: args.sessionType,
         startTime: args.startTime,
@@ -37,6 +40,7 @@ const focusEngineAPI = {
       })
     } else {
       return ipcRenderer.invoke('session:save', {
+        sessionId: args.sessionId,
         mode: args.mode,
         sessionType: null,
         startTime: args.startTime,
@@ -80,6 +84,27 @@ const focusEngineAPI = {
 
   toggleBlockedDomain: (domain: string, enabled: boolean) => {
     return ipcRenderer.invoke('blocking:toggleDomain', { domain, enabled })
+  },
+
+  // App blocking endpoints
+  killBlacklistedApps: (sessionId: string) => {
+    return ipcRenderer.invoke('appBlocking:killBlacklisted', { sessionId })
+  },
+
+  getBlacklistedApps: () => {
+    return ipcRenderer.invoke('appBlocking:getApps')
+  },
+
+  addBlacklistedApp: (appName: string) => {
+    return ipcRenderer.invoke('appBlocking:addApp', appName)
+  },
+
+  removeBlacklistedApp: (appName: string) => {
+    return ipcRenderer.invoke('appBlocking:removeApp', appName)
+  },
+
+  toggleBlacklistedApp: (appName: string, enabled: boolean) => {
+    return ipcRenderer.invoke('appBlocking:toggleApp', { appName, enabled })
   }
 }
 

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { DEFAULT_BLOCKED_DOMAINS } from '../blocking/blockedDomainsList'
+import { DEFAULT_BLACKLISTED_APPS } from '../blocking/blacklistedAppsList'
 
 let db: Database.Database | null = null
 
@@ -42,18 +43,50 @@ export function getDatabase(): Database.Database {
     );
   `)
 
+  // Create blacklisted_apps table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS blacklisted_apps (
+      app_name TEXT PRIMARY KEY,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
+    );
+  `)
+
+  // Create app_kill_events table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_kill_events (
+      event_id TEXT PRIMARY KEY,
+      session_id TEXT,
+      app_name TEXT NOT NULL,
+      killed_at INTEGER NOT NULL,
+      FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+    );
+  `)
+
   // Seed blocked_domains if empty
-  const countRow = db.prepare('SELECT COUNT(*) as count FROM blocked_domains').get() as { count: number }
-  if (countRow.count === 0) {
+  const domainCount = db.prepare('SELECT COUNT(*) as count FROM blocked_domains').get() as { count: number }
+  if (domainCount.count === 0) {
     console.log('[DB] Seeding default blocked domains...')
     const insertStmt = db.prepare('INSERT INTO blocked_domains (domain, enabled) VALUES (?, 1)')
-    // Seed using a transaction for efficiency
     const transaction = db.transaction((domains: string[]) => {
       for (const d of domains) {
         insertStmt.run(d)
       }
     })
     transaction(DEFAULT_BLOCKED_DOMAINS)
+  }
+
+  // Seed blacklisted_apps if empty
+  const appCount = db.prepare('SELECT COUNT(*) as count FROM blacklisted_apps').get() as { count: number }
+  if (appCount.count === 0) {
+    console.log('[DB] Seeding default blacklisted apps...')
+    const insertStmt = db.prepare('INSERT INTO blacklisted_apps (app_name, enabled) VALUES (?, 1)')
+    const transaction = db.transaction((apps: string[]) => {
+      for (const a of apps) {
+        insertStmt.run(a)
+      }
+    })
+    transaction(DEFAULT_BLACKLISTED_APPS)
   }
 
   console.log('[DB] Database initialized, schema ready')

@@ -2,6 +2,7 @@ import { ElectronAPI } from '@electron-toolkit/preload'
 
 type SaveSessionArgs =
   | {
+      sessionId: string
       mode: 'pomodoro'
       sessionType: 'focus' | 'shortBreak' | 'longBreak'
       startTime: number
@@ -12,6 +13,7 @@ type SaveSessionArgs =
       endReason: 'auto_complete' | 'abandoned'
     }
   | {
+      sessionId: string
       mode: 'standard'
       startTime: number
       endTime: number
@@ -40,6 +42,12 @@ interface BlockedDomainRow {
   created_at: number
 }
 
+interface BlacklistedAppRow {
+  app_name: string
+  enabled: number // 0 or 1
+  created_at: number
+}
+
 interface IPCResult<T = unknown> {
   success: boolean
   data?: T
@@ -58,6 +66,13 @@ interface FocusEngineAPI {
   addBlockedDomain: (domain: string) => Promise<IPCResult<void>>
   removeBlockedDomain: (domain: string) => Promise<IPCResult<void>>
   toggleBlockedDomain: (domain: string, enabled: boolean) => Promise<IPCResult<void>>
+
+  // App blocking endpoints
+  killBlacklistedApps: (sessionId: string) => Promise<IPCResult<string[]>>
+  getBlacklistedApps: () => Promise<IPCResult<BlacklistedAppRow[]>>
+  addBlacklistedApp: (appName: string) => Promise<IPCResult<void>>
+  removeBlacklistedApp: (appName: string) => Promise<IPCResult<void>>
+  toggleBlacklistedApp: (appName: string, enabled: boolean) => Promise<IPCResult<void>>
 }
 
 declare global {

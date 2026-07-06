@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto'
 import { getDatabase } from './db'
 
 export interface SessionRow {
@@ -25,6 +24,7 @@ export interface SessionRow {
  *  - Standard MUST NOT have planned duration or session type
  */
 export function saveSession(params: {
+  sessionId: string
   mode: 'pomodoro' | 'standard'
   sessionType: 'focus' | 'shortBreak' | 'longBreak' | null
   startTime: number
@@ -35,6 +35,7 @@ export function saveSession(params: {
   endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
 }): SessionRow {
   const {
+    sessionId,
     mode,
     sessionType,
     startTime,
@@ -74,7 +75,6 @@ export function saveSession(params: {
   }
 
   const db = getDatabase()
-  const sessionId = randomUUID()
 
   const stmt = db.prepare(`
     INSERT INTO sessions (

@@ -15,6 +15,7 @@ export function registerSessionHandlers(): void {
     async (
       _event,
       args: {
+        sessionId: string
         mode: 'pomodoro' | 'standard'
         sessionType: 'focus' | 'shortBreak' | 'longBreak' | null
         startTime: number
