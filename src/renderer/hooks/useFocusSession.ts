@@ -22,14 +22,22 @@ export const useFocusSession = () => {
   const [blockingError, setBlockingError] = useState<string | null>(null)
   const [appsKilled, setAppsKilled] = useState<string[]>([])
   const [summary, setSummary] = useState<SessionSummary | null>(null)
+  const [activeWindow, setActiveWindow] = useState<{ appName: string; windowTitle: string } | null>(null)
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')
   const hasSavedRef = useRef<boolean>(false)
   const isBlockingSessionRef = useRef<boolean>(false)
 
-  // Clean up hosts blocking
+  // Clean up hosts blocking and telemetry poller
   const performBlockingCleanup = useCallback(async () => {
+    try {
+      await window.focusEngineAPI.stopTelemetry()
+      setActiveWindow(null)
+    } catch (err) {
+      console.error('[useFocusSession] stopTelemetry failed:', err)
+    }
+
     if (isBlockingSessionRef.current) {
       try {
         await window.focusEngineAPI.stopBlocking()
@@ -38,6 +46,16 @@ export const useFocusSession = () => {
         console.error('[useFocusSession] stopBlocking failed:', err)
       }
       isBlockingSessionRef.current = false
+    }
+  }, [])
+
+  // Listen to live telemetry updates from the main process
+  useEffect(() => {
+    const unsubscribe = window.focusEngineAPI.onActiveWindowUpdate((info) => {
+      setActiveWindow(info)
+    })
+    return () => {
+      unsubscribe()
     }
   }, [])
 
@@ -146,9 +164,9 @@ export const useFocusSession = () => {
     }
 
     if (timer.state === 'running' && isBlockingSessionRef.current) {
-      // Run once immediately, then check every 5 seconds
+      // Run once immediately, then check every 30 seconds
       runActiveAppBlocking()
-      intervalId = setInterval(runActiveAppBlocking, 5000)
+      intervalId = setInterval(runActiveAppBlocking, 30000)
     }
 
     return () => {
@@ -195,6 +213,13 @@ export const useFocusSession = () => {
       }
     }
 
+    // Start active window tracking telemetry
+    try {
+      await window.focusEngineAPI.startTelemetry(sessionIdRef.current)
+    } catch (err) {
+      console.error('[useFocusSession] Failed to start telemetry:', err)
+    }
+
     timer.startPomodoro(type, durationMinutes)
     hasSavedRef.current = false
   }, [timer])
@@ -228,6 +253,13 @@ export const useFocusSession = () => {
       }
     } catch (err) {
       console.error('[useFocusSession] Failed to kill blacklisted apps:', err)
+    }
+
+    // Start active window tracking telemetry
+    try {
+      await window.focusEngineAPI.startTelemetry(sessionIdRef.current)
+    } catch (err) {
+      console.error('[useFocusSession] Failed to start telemetry:', err)
     }
 
     timer.startStandard()
@@ -288,6 +320,7 @@ export const useFocusSession = () => {
     blockingError,
     appsKilled,
     summary,
+    activeWindow,
     startPomodoroSession,
     startStandardSession,
     pauseSession,

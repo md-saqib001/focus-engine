@@ -72,6 +72,14 @@ interface FocusEngineAPI {
   addBlacklistedApp: (appName: string) => Promise<IPCResult<void>>
   removeBlacklistedApp: (appName: string) => Promise<IPCResult<void>>
   toggleBlacklistedApp: (appName: string, enabled: boolean) => Promise<IPCResult<void>>
+
+  // Telemetry endpoints
+  startTelemetry: (sessionId: string) => Promise<IPCResult<void>>
+  stopTelemetry: () => Promise<IPCResult<void>>
+  getWindowHistory: (sessionId: string) => Promise<IPCResult<any[]>>
+  onActiveWindowUpdate: (
+    callback: (info: { appName: string; windowTitle: string }) => void
+  ) => () => void
 }
 
 declare global {

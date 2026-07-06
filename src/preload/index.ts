@@ -105,6 +105,28 @@ const focusEngineAPI = {
 
   toggleBlacklistedApp: (appName: string, enabled: boolean) => {
     return ipcRenderer.invoke('appBlocking:toggleApp', { appName, enabled })
+  },
+
+  // Telemetry endpoints
+  startTelemetry: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:start', { sessionId })
+  },
+
+  stopTelemetry: () => {
+    return ipcRenderer.invoke('telemetry:stop')
+  },
+
+  getWindowHistory: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:getWindowHistory', { sessionId })
+  },
+
+  onActiveWindowUpdate: (callback: (info: { appName: string; windowTitle: string }) => void) => {
+    const subscription = (_event: any, data: { appName: string; windowTitle: string }) => callback(data)
+    ipcRenderer.on('telemetry:activeWindowUpdate', subscription)
+    // Return unsubscribe function
+    return () => {
+      ipcRenderer.removeListener('telemetry:activeWindowUpdate', subscription)
+    }
   }
 }
 

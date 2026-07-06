@@ -18,6 +18,7 @@ const DashboardContent: React.FC = () => {
     blockingError,
     appsKilled,
     summary,
+    activeWindow,
     startPomodoroSession,
     startStandardSession,
     pauseSession,
@@ -293,6 +294,29 @@ const DashboardContent: React.FC = () => {
                     Apps Terminated: <strong style={{ color: appsKilled.length > 0 ? '#818cf8' : '#94a3b8' }}>{appsKilled.length}</strong>
                   </span>
                 </div>
+              </div>
+            )}
+
+            {/* Live Active Window indicator */}
+            {timerState !== 'idle' && timerState !== 'completed' && activeWindow && (
+              <div
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  backgroundColor: 'rgba(129, 140, 248, 0.05)',
+                  border: '1.5px dashed rgba(129, 140, 248, 0.2)',
+                  borderRadius: '10px',
+                  fontSize: '12px',
+                  color: '#94a3b8',
+                  textAlign: 'center',
+                  lineHeight: '1.5',
+                  wordBreak: 'break-all'
+                }}
+              >
+                <span>Currently active: </span>
+                <strong style={{ color: '#818cf8' }}>{activeWindow.appName}</strong>
+                <span style={{ color: '#475569' }}> — </span>
+                <span style={{ color: '#f8fafc' }}>{activeWindow.windowTitle}</span>
               </div>
             )}
 

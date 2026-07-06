@@ -76,6 +76,21 @@ export function getDatabase(): Database.Database {
     );
   `)
 
+  // Create window_focus table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS window_focus (
+      session_id TEXT NOT NULL,
+      app_name TEXT NOT NULL,
+      window_title TEXT NOT NULL,
+      timestamp INTEGER NOT NULL
+    );
+  `)
+
+  // Create index on session_id for quick history lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_window_focus_session_id ON window_focus(session_id);
+  `)
+
   // Seed blocked_domains if empty
   const domainCount = db.prepare('SELECT COUNT(*) as count FROM blocked_domains').get() as { count: number }
   if (domainCount.count === 0) {

@@ -13,16 +13,33 @@ import {
 } from '../blocking/hostsFileManager'
 import { closeActiveBlockedTabs } from '../blocking/tabCloser'
 
+let tabCloserInterval: NodeJS.Timeout | null = null
+
 export function registerBlockingHandlers(): void {
   // Start active blocking (writes to hosts file and closes existing tabs)
   ipcMain.handle('blocking:start', async () => {
     try {
       const domains = getEnabledBlockedDomains()
       await blockDomains(domains)
-      // Fire-and-forget: close active browser tabs containing blocked domains
+      
+      // Fire-and-forget immediate close of active browser tabs containing blocked domains
       closeActiveBlockedTabs(domains).catch((err) =>
         console.error('[IPC blocking:start] Tab closer error:', err)
       )
+
+      // Clear any existing active tab closer interval
+      if (tabCloserInterval) {
+        clearInterval(tabCloserInterval)
+        tabCloserInterval = null
+      }
+
+      // Periodically check and close matching tabs every 30 seconds (30,000 ms) while focus is on
+      tabCloserInterval = setInterval(() => {
+        closeActiveBlockedTabs(domains).catch((err) =>
+          console.error('[IPC tabCloserInterval] Tab closer error:', err)
+        )
+      }, 30000)
+
       return { success: true }
     } catch (error: any) {
       console.error('[IPC blocking:start]', error)
@@ -33,6 +50,12 @@ export function registerBlockingHandlers(): void {
   // Stop active blocking (removes block from hosts file)
   ipcMain.handle('blocking:stop', async () => {
     try {
+      // Safely clear the active tab closer interval
+      if (tabCloserInterval) {
+        clearInterval(tabCloserInterval)
+        tabCloserInterval = null
+      }
+      
       await restoreHosts()
       return { success: true }
     } catch (error: any) {

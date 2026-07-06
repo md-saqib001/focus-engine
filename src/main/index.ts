@@ -6,6 +6,7 @@ import { getDatabase, closeDatabase } from './database/db'
 import { registerSessionHandlers } from './ipc/sessionHandlers'
 import { registerBlockingHandlers } from './ipc/blockingHandlers'
 import { registerAppBlockingHandlers } from './ipc/appBlockingHandlers'
+import { registerTelemetryHandlers } from './ipc/telemetryHandlers'
 import { restoreHostsSync } from './blocking/hostsFileManager'
 
 function createWindow(): void {
@@ -64,6 +65,7 @@ app.whenReady().then(() => {
   registerSessionHandlers()
   registerBlockingHandlers()
   registerAppBlockingHandlers()
+  registerTelemetryHandlers()
 
   createWindow()
 
