@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Card, TimerDisplay, Button } from '@/components/ui'
 import { useFocusSessionContext } from '../context/FocusSessionContext'
 import LiveTelemetryPanel from '../components/LiveTelemetryPanel'
+import DistractionAlert from '../components/DistractionAlert'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { Play, Pause, Square, RotateCcw, X, ShieldAlert, CheckCircle, AlertCircle } from 'lucide-react'
 import { SessionType } from '../types/timer'
@@ -97,6 +98,7 @@ const DashboardContent: React.FC = () => {
         animation: flash ? 'flashEffect 0.5s ease-out 4' : 'none'
       }}
     >
+      <DistractionAlert />
       <div>
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc', margin: '0 0 4px 0' }}>Dashboard</h1>
         <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>Manage and monitor your active session.</p>

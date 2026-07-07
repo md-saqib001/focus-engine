@@ -164,6 +164,10 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:getLiveMouseCounts')
   },
 
+  getDistractionEvents: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:getDistractionEvents', { sessionId })
+  },
+
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
@@ -201,6 +205,14 @@ const focusEngineAPI = {
     ipcRenderer.on('telemetry:activityUpdate', subscription)
     return () => {
       ipcRenderer.removeListener('telemetry:activityUpdate', subscription)
+    }
+  },
+
+  onDistractionEvent: (callback: (event: { eventType: string; eventData: any; timestamp: number }) => void) => {
+    const subscription = (_event: any, data: { eventType: string; eventData: any; timestamp: number }) => callback(data)
+    ipcRenderer.on('telemetry:distractionEvent', subscription)
+    return () => {
+      ipcRenderer.removeListener('telemetry:distractionEvent', subscription)
     }
   }
 }

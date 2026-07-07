@@ -30,6 +30,7 @@ const History: React.FC = () => {
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
   const [breakdown, setBreakdown] = useState<{ [category: string]: number }>({})
   const [summary, setSummary] = useState<any | null>(null)
+  const [distractionEvents, setDistractionEvents] = useState<any[]>([])
   const [detailLoading, setDetailLoading] = useState(false)
 
   const fetchSessions = async (): Promise<void> => {
@@ -55,6 +56,7 @@ const History: React.FC = () => {
       setExpandedSessionId(null)
       setSummary(null)
       setBreakdown({})
+      setDistractionEvents([])
       return
     }
 
@@ -62,8 +64,16 @@ const History: React.FC = () => {
     setDetailLoading(true)
     setBreakdown({})
     setSummary(null)
+    setDistractionEvents([])
 
     try {
+      // 1. Fetch distraction warnings timeline
+      const distRes = await window.focusEngineAPI.getDistractionEvents(sessionId)
+      if (distRes.success && distRes.data) {
+        setDistractionEvents(distRes.data)
+      }
+
+      // 2. Fetch session summary details
       const res = await window.focusEngineAPI.getSessionSummary(sessionId)
       if (res.success && res.data) {
         setSummary(res.data)
@@ -95,6 +105,26 @@ const History: React.FC = () => {
       return `${h}h ${m}m ${s}s`
     }
     return `${m}m ${s}s`
+  }
+
+  const formatEventText = (type: string, dataStr: string): string => {
+    try {
+      const data = JSON.parse(dataStr)
+      switch (type) {
+        case 'sustained_distraction':
+          return `Spent 60+ seconds continuously on distraction category (${data.appName || 'unknown'} - ${data.domain || 'unknown'})`
+        case 'excessive_switching':
+          return `Excessive multitasking: switched applications ${data.switchCount} times within 2 minutes`
+        case 'blacklist_visit':
+          return `Visited blacklisted domain "${data.domain}" in ${data.appName}`
+        case 'extended_idle':
+          return `Extended inactivity: remained idle for ${Math.round(data.idleSeconds / 60)} minutes`
+        default:
+          return `Distraction detected: ${type}`
+      }
+    } catch {
+      return `Distraction warning: ${type}`
+    }
   }
 
   const formatDate = (timestamp: number): string => {
@@ -444,6 +474,57 @@ const History: React.FC = () => {
                                                 {summary.mostDistractingDomain || 'None'}
                                               </div>
                                             </div>
+                                          </div>
+
+                                          {/* Distraction Events List */}
+                                          <div style={{ marginTop: '20px' }}>
+                                            <div style={{ fontSize: '12px', fontWeight: 600, color: '#f8fafc', marginBottom: '8px' }}>
+                                              Focus Warning Logs ({distractionEvents.length})
+                                            </div>
+                                            {distractionEvents.length === 0 ? (
+                                              <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', padding: '6px 8px', backgroundColor: '#0c0c14', borderRadius: '6px', border: '1px solid #161624' }}>
+                                                No distraction events occurred during this session.
+                                              </div>
+                                            ) : (
+                                              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '180px', overflowY: 'auto', paddingRight: '4px' }}>
+                                                {distractionEvents.map((evt) => (
+                                                  <div
+                                                    key={evt.id}
+                                                    style={{
+                                                      display: 'flex',
+                                                      alignItems: 'center',
+                                                      justifyContent: 'space-between',
+                                                      gap: '12px',
+                                                      padding: '8px 12px',
+                                                      backgroundColor: '#0c0c14',
+                                                      border: '1px solid #161624',
+                                                      borderRadius: '6px',
+                                                      fontSize: '11px'
+                                                    }}
+                                                  >
+                                                    <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#e2e8f0' }}>
+                                                      <span
+                                                        style={{
+                                                          padding: '2px 6px',
+                                                          borderRadius: '4px',
+                                                          backgroundColor: evt.event_type === 'extended_idle' ? 'rgba(100, 116, 139, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                                          color: evt.event_type === 'extended_idle' ? '#94a3b8' : '#ef4444',
+                                                          fontWeight: 600,
+                                                          fontSize: '9px',
+                                                          textTransform: 'uppercase'
+                                                        }}
+                                                      >
+                                                        {evt.event_type.replace('_', ' ')}
+                                                      </span>
+                                                      <span>{formatEventText(evt.event_type, evt.event_data)}</span>
+                                                    </span>
+                                                    <span style={{ color: '#475569', whiteSpace: 'nowrap' }}>
+                                                      {new Date(evt.timestamp).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
                                           </div>
                                         </div>
                                       )}

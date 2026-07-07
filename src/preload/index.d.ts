@@ -108,6 +108,7 @@ interface FocusEngineAPI {
     clicks: number
     movements: number
   }>>
+  getDistractionEvents: (sessionId: string) => Promise<IPCResult<any[]>>
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
@@ -121,6 +122,13 @@ interface FocusEngineAPI {
     callback: (info: {
       status: 'Active' | 'Idle'
       idleSeconds: number
+    }) => void
+  ) => () => void
+  onDistractionEvent: (
+    callback: (event: {
+      eventType: string
+      eventData: any
+      timestamp: number
     }) => void
   ) => () => void
 }

@@ -26,6 +26,18 @@ export class TelemetryPoller {
 
   private readonly BATCH_SIZE = 12
 
+  private listeners: ((info: BroadcastActiveWindowInfo) => void)[] = []
+
+  /**
+   * Registers a callback listener to trigger on every active window poll tick.
+   */
+  public onTick(cb: (info: BroadcastActiveWindowInfo) => void): () => void {
+    this.listeners.push(cb)
+    return () => {
+      this.listeners = this.listeners.filter((l) => l !== cb)
+    }
+  }
+
   /**
    * Starts telemetry polling for the active focus session.
    * Runs every 5 seconds.
@@ -55,12 +67,23 @@ export class TelemetryPoller {
             timestamp: now
           })
 
-          // 2. Broadcast live update immediately to renderer process (Dashboard live dot)
-          this.broadcastUpdate({
+          const tickInfo: BroadcastActiveWindowInfo = {
             appName: activeWindow.appName,
             windowTitle: activeWindow.windowTitle,
             domain: classification.domain,
             category: classification.category
+          }
+
+          // 2. Broadcast live update immediately to renderer process (Dashboard live dot)
+          this.broadcastUpdate(tickInfo)
+
+          // Trigger callbacks for internal observers (e.g. DistractionDetector)
+          this.listeners.forEach((l) => {
+            try {
+              l(tickInfo)
+            } catch (e) {
+              console.error('[TelemetryPoller] observer callback failed:', e)
+            }
           })
 
           // 3. Flush buffer to SQLite database in a batch if batch size reached

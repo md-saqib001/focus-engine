@@ -17,9 +17,11 @@ import { validateSession } from '../telemetry/validateTelemetry'
 import { getActiveWindow } from '../telemetry/activeWindowTracker'
 import { classifyWindow } from '../telemetry/domainClassifier'
 import { mouseTracker } from '../telemetry/mouseTracker'
+import { distractionDetector } from '../telemetry/distractionDetector'
+import { getForSession as getDistractionEvents } from '../database/distractionEventsRepository'
 
 export function registerTelemetryHandlers(): void {
-  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking
+  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking + distraction detector
   ipcMain.handle(
     'telemetry:start',
     async (_event, args: { sessionId: string }) => {
@@ -27,6 +29,7 @@ export function registerTelemetryHandlers(): void {
         telemetryPoller.start(args.sessionId)
         kpmTracker.start(args.sessionId)
         mouseMetricsTracker.start(args.sessionId)
+        distractionDetector.start(args.sessionId)
         return { success: true }
       } catch (error: any) {
         console.error('[IPC telemetry:start]', error)
@@ -35,12 +38,13 @@ export function registerTelemetryHandlers(): void {
     }
   )
 
-  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking
+  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking + distraction detector
   ipcMain.handle('telemetry:stop', async () => {
     try {
       telemetryPoller.stop()
       kpmTracker.stop()
       mouseMetricsTracker.stop()
+      distractionDetector.stop()
       return { success: true }
     } catch (error: any) {
       console.error('[IPC telemetry:stop]', error)
@@ -234,6 +238,20 @@ export function registerTelemetryHandlers(): void {
         return { success: true, data: counts }
       } catch (error: any) {
         console.error('[IPC telemetry:getLiveMouseCounts]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:getDistractionEvents — retrieves logged distraction warning events for a session
+  ipcMain.handle(
+    'telemetry:getDistractionEvents',
+    async (_event, args: { sessionId: string }) => {
+      try {
+        const events = getDistractionEvents(args.sessionId)
+        return { success: true, data: events }
+      } catch (error: any) {
+        console.error('[IPC telemetry:getDistractionEvents]', error)
         return { success: false, error: error.message || String(error) }
       }
     }
