@@ -22,7 +22,12 @@ export const useFocusSession = () => {
   const [blockingError, setBlockingError] = useState<string | null>(null)
   const [appsKilled, setAppsKilled] = useState<string[]>([])
   const [summary, setSummary] = useState<SessionSummary | null>(null)
-  const [activeWindow, setActiveWindow] = useState<{ appName: string; windowTitle: string } | null>(null)
+  const [activeWindow, setActiveWindow] = useState<{
+    appName: string
+    windowTitle: string
+    domain: string
+    category: 'productive' | 'distraction' | 'neutral' | 'unknown'
+  } | null>(null)
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')

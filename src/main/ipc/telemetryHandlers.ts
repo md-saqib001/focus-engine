@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron'
 import { telemetryPoller } from '../telemetry/telemetryPoller'
-import { getWindowFocusHistory } from '../database/windowFocusRepository'
+import { getWindowFocusHistory, getCategoryBreakdown } from '../database/windowFocusRepository'
 
 export function registerTelemetryHandlers(): void {
   // telemetry:start — starts telemetry window tracking
@@ -37,6 +37,20 @@ export function registerTelemetryHandlers(): void {
         return { success: true, data: history }
       } catch (error: any) {
         console.error('[IPC telemetry:getWindowHistory]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:getCategoryBreakdown — retrieves grouped breakdown counts for a session
+  ipcMain.handle(
+    'telemetry:getCategoryBreakdown',
+    async (_event, args: { sessionId: string }) => {
+      try {
+        const breakdown = getCategoryBreakdown(args.sessionId)
+        return { success: true, data: breakdown }
+      } catch (error: any) {
+        console.error('[IPC telemetry:getCategoryBreakdown]', error)
         return { success: false, error: error.message || String(error) }
       }
     }

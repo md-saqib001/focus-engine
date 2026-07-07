@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card } from '@/components/ui'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, BarChart2, ShieldAlert } from 'lucide-react'
 
 interface SessionRow {
   session_id: string
@@ -17,9 +17,19 @@ interface SessionRow {
   apps_killed?: number
 }
 
+interface CategoryBreakdownItem {
+  category: string
+  focus_count: number
+}
+
 const History: React.FC = () => {
   const [sessions, setSessions] = useState<SessionRow[]>([])
   const [loading, setLoading] = useState(true)
+  
+  // Row expansion and details states
+  const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
+  const [breakdown, setBreakdown] = useState<{ [category: string]: number }>({})
+  const [detailLoading, setDetailLoading] = useState(false)
 
   const fetchSessions = async (): Promise<void> => {
     setLoading(true)
@@ -38,6 +48,32 @@ const History: React.FC = () => {
   useEffect(() => {
     fetchSessions()
   }, [])
+
+  const handleRowClick = async (sessionId: string) => {
+    if (expandedSessionId === sessionId) {
+      setExpandedSessionId(null)
+      return
+    }
+
+    setExpandedSessionId(sessionId)
+    setDetailLoading(true)
+    setBreakdown({})
+
+    try {
+      const res = await window.focusEngineAPI.getCategoryBreakdown(sessionId)
+      if (res.success && res.data) {
+        const itemMap: { [category: string]: number } = {}
+        res.data.forEach((item: CategoryBreakdownItem) => {
+          itemMap[item.category] = item.focus_count
+        })
+        setBreakdown(itemMap)
+      }
+    } catch (err) {
+      console.error('[History] Failed to fetch category breakdown:', err)
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   const formatDuration = (seconds: number | null): string => {
     if (seconds === null) return '—'
@@ -83,7 +119,7 @@ const History: React.FC = () => {
   const getEndReasonColor = (reason: string | null): string => {
     switch (reason) {
       case 'auto_complete': return '#10b981'
-      case 'manual_stop': return '#10b981' // Manual stop in standard counts as success
+      case 'manual_stop': return '#10b981'
       case 'abandoned': return '#f59e0b'
       case 'force_ended': return '#ef4444'
       default: return '#64748b'
@@ -161,50 +197,200 @@ const History: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {sessions.map((session) => (
-                  <tr key={session.session_id}>
-                    <td style={tdStyle}>
-                      {formatDate(session.start_time)}
-                    </td>
-                    <td style={tdStyle}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '3px 10px',
-                          borderRadius: '6px',
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          backgroundColor: session.session_mode === 'pomodoro' ? 'rgba(129, 140, 248, 0.12)' : 'rgba(16, 185, 129, 0.12)',
-                          color: session.session_mode === 'pomodoro' ? '#818cf8' : '#10b981',
-                          textTransform: 'capitalize'
+                {sessions.map((session) => {
+                  const isExpanded = expandedSessionId === session.session_id
+                  return (
+                    <React.Fragment key={session.session_id}>
+                      <tr 
+                        onClick={() => handleRowClick(session.session_id)}
+                        style={{ 
+                          cursor: 'pointer', 
+                          backgroundColor: isExpanded ? 'rgba(129, 140, 248, 0.04)' : 'transparent',
+                          transition: 'background-color 0.2s ease'
                         }}
+                        onMouseEnter={(e) => { if(!isExpanded) e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.02)' }}
+                        onMouseLeave={(e) => { if(!isExpanded) e.currentTarget.style.backgroundColor = 'transparent' }}
                       >
-                        {session.session_mode}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      {formatSessionType(session.session_type)}
-                    </td>
-                    <td style={tdStyle}>
-                      {formatDuration(session.duration_actual_sec)}
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{ fontWeight: 600, color: (session.apps_killed ?? 0) > 0 ? '#818cf8' : '#64748b' }}>
-                        {session.apps_killed ?? 0}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{ color: session.completed ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
-                        {session.completed ? '✓ Yes' : '✗ No'}
-                      </span>
-                    </td>
-                    <td style={tdStyle}>
-                      <span style={{ color: getEndReasonColor(session.end_reason), fontWeight: 550 }}>
-                        {formatEndReason(session.end_reason)}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                        <td style={tdStyle}>
+                          {formatDate(session.start_time)}
+                        </td>
+                        <td style={tdStyle}>
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '3px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              backgroundColor: session.session_mode === 'pomodoro' ? 'rgba(129, 140, 248, 0.12)' : 'rgba(16, 185, 129, 0.12)',
+                              color: session.session_mode === 'pomodoro' ? '#818cf8' : '#10b981',
+                              textTransform: 'capitalize'
+                            }}
+                          >
+                            {session.session_mode}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          {formatSessionType(session.session_type)}
+                        </td>
+                        <td style={tdStyle}>
+                          {formatDuration(session.duration_actual_sec)}
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ fontWeight: 600, color: (session.apps_killed ?? 0) > 0 ? '#818cf8' : '#64748b' }}>
+                            {session.apps_killed ?? 0}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ color: session.completed ? '#10b981' : '#f59e0b', fontWeight: 600 }}>
+                            {session.completed ? '✓ Yes' : '✗ No'}
+                          </span>
+                        </td>
+                        <td style={tdStyle}>
+                          <span style={{ color: getEndReasonColor(session.end_reason), fontWeight: 550 }}>
+                            {formatEndReason(session.end_reason)}
+                          </span>
+                        </td>
+                      </tr>
+
+                      {isExpanded && (
+                        <tr style={{ backgroundColor: '#09090f' }}>
+                          <td colSpan={7} style={{ padding: '20px 24px', borderBottom: '1px solid #1e1e2f' }}>
+                            {detailLoading ? (
+                              <div style={{ color: '#64748b', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <RefreshCw size={14} className="spin" />
+                                <span>Loading focus telemetry analytics...</span>
+                              </div>
+                            ) : Object.keys(breakdown).length === 0 ? (
+                              <div style={{ color: '#64748b', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ShieldAlert size={14} />
+                                <span>No active window telemetry recorded for this session.</span>
+                              </div>
+                            ) : (
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                                  <BarChart2 size={16} style={{ color: '#818cf8' }} />
+                                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                                    Productivity Category Breakdown
+                                  </span>
+                                </div>
+
+                                {/* Stacked Progress Bar */}
+                                {(() => {
+                                  const totalTicks = Object.values(breakdown).reduce((a, b) => a + b, 0)
+                                  const prod = breakdown['productive'] || 0
+                                  const dist = breakdown['distraction'] || 0
+                                  const neut = breakdown['neutral'] || 0
+                                  const unkn = breakdown['unknown'] || 0
+
+                                  const prodPct = (prod / totalTicks) * 100
+                                  const distPct = (dist / totalTicks) * 100
+                                  const neutPct = (neut / totalTicks) * 100
+                                  const unknPct = (unkn / totalTicks) * 100
+
+                                  const formatTime = (ticks: number) => {
+                                    const sec = ticks * 5 // each tick is 5 seconds
+                                    const m = Math.floor(sec / 60)
+                                    const s = sec % 60
+                                    return m > 0 ? `${m}m ${s}s` : `${s}s`
+                                  }
+
+                                  return (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                      {/* Bar chart */}
+                                      <div
+                                        style={{
+                                          display: 'flex',
+                                          height: '14px',
+                                          borderRadius: '7px',
+                                          overflow: 'hidden',
+                                          backgroundColor: '#1e1e2f',
+                                          width: '100%'
+                                        }}
+                                      >
+                                        {prod > 0 && (
+                                          <div
+                                            style={{
+                                              width: `${prodPct}%`,
+                                              backgroundColor: '#10b981',
+                                              transition: 'width 0.3s ease'
+                                            }}
+                                            title={`Productive: ${prodPct.toFixed(0)}%`}
+                                          />
+                                        )}
+                                        {dist > 0 && (
+                                          <div
+                                            style={{
+                                              width: `${distPct}%`,
+                                              backgroundColor: '#ef4444',
+                                              transition: 'width 0.3s ease'
+                                            }}
+                                            title={`Distraction: ${distPct.toFixed(0)}%`}
+                                          />
+                                        )}
+                                        {neut > 0 && (
+                                          <div
+                                            style={{
+                                              width: `${neutPct}%`,
+                                              backgroundColor: '#475569',
+                                              transition: 'width 0.3s ease'
+                                            }}
+                                            title={`Neutral: ${neutPct.toFixed(0)}%`}
+                                          />
+                                        )}
+                                        {unkn > 0 && (
+                                          <div
+                                            style={{
+                                              width: `${unknPct}%`,
+                                              backgroundColor: '#1e293b',
+                                              transition: 'width 0.3s ease'
+                                            }}
+                                            title={`Unknown: ${unknPct.toFixed(0)}%`}
+                                          />
+                                        )}
+                                      </div>
+
+                                      {/* Legends with computed times */}
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '12px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
+                                          <span style={{ color: '#94a3b8' }}>Productive:</span>
+                                          <strong style={{ color: '#f8fafc' }}>{formatTime(prod)}</strong>
+                                          <span style={{ color: '#64748b' }}>({prodPct.toFixed(0)}%)</span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                                          <span style={{ color: '#94a3b8' }}>Distraction:</span>
+                                          <strong style={{ color: '#f8fafc' }}>{formatTime(dist)}</strong>
+                                          <span style={{ color: '#64748b' }}>({distPct.toFixed(0)}%)</span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#475569' }} />
+                                          <span style={{ color: '#94a3b8' }}>Neutral:</span>
+                                          <strong style={{ color: '#f8fafc' }}>{formatTime(neut)}</strong>
+                                          <span style={{ color: '#64748b' }}>({neutPct.toFixed(0)}%)</span>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                          <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#1e293b' }} />
+                                          <span style={{ color: '#94a3b8' }}>Unknown:</span>
+                                          <strong style={{ color: '#f8fafc' }}>{formatTime(unkn)}</strong>
+                                          <span style={{ color: '#64748b' }}>({unknPct.toFixed(0)}%)</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )
+                                })()}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>

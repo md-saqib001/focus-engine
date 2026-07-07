@@ -82,9 +82,30 @@ export function getDatabase(): Database.Database {
       session_id TEXT NOT NULL,
       app_name TEXT NOT NULL,
       window_title TEXT NOT NULL,
+      domain TEXT,
+      category TEXT,
       timestamp INTEGER NOT NULL
     );
   `)
+
+  // Migrate existing window_focus tables that lack the domain and category columns
+  try {
+    const columns = db.pragma("table_info(window_focus)") as { name: string }[]
+    if (columns.length > 0) {
+      const hasDomain = columns.some((c) => c.name === 'domain')
+      const hasCategory = columns.some((c) => c.name === 'category')
+      if (!hasDomain) {
+        console.log('[DB] Migrating window_focus table: Adding domain column...')
+        db.exec('ALTER TABLE window_focus ADD COLUMN domain TEXT;')
+      }
+      if (!hasCategory) {
+        console.log('[DB] Migrating window_focus table: Adding category column...')
+        db.exec('ALTER TABLE window_focus ADD COLUMN category TEXT;')
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Failed window_focus table migration check:', err)
+  }
 
   // Create index on session_id for quick history lookups
   db.exec(`

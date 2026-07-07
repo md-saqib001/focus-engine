@@ -1,10 +1,29 @@
 import { BrowserWindow } from 'electron'
-import { getActiveWindow, ActiveWindowInfo } from './activeWindowTracker'
-import { insertWindowFocus } from '../database/windowFocusRepository'
+import { getActiveWindow } from './activeWindowTracker'
+import { insertBatch } from '../database/windowFocusRepository'
+import { classifyWindow } from './domainClassifier'
+
+export interface BroadcastActiveWindowInfo {
+  appName: string
+  windowTitle: string
+  domain: string
+  category: 'productive' | 'distraction' | 'neutral' | 'unknown'
+}
 
 export class TelemetryPoller {
   private intervalId: NodeJS.Timeout | null = null
   private currentSessionId: string | null = null
+  
+  // In-memory buffer to batch inserts and minimize disk write locks
+  private buffer: {
+    sessionId: string
+    appName: string
+    windowTitle: string
+    domain: string
+    category: string
+  }[] = []
+
+  private readonly BATCH_SIZE = 12
 
   /**
    * Starts telemetry polling for the active focus session.
@@ -13,6 +32,7 @@ export class TelemetryPoller {
   public start(sessionId: string): void {
     this.stop() // Safely clear any previous poller first
     this.currentSessionId = sessionId
+    this.buffer = [] // Reset buffer on new session start
 
     const poll = async () => {
       if (!this.currentSessionId) return
@@ -20,15 +40,30 @@ export class TelemetryPoller {
       try {
         const activeWindow = await getActiveWindow()
         if (activeWindow && this.currentSessionId) {
-          // 1. Insert into database
-          insertWindowFocus(
-            this.currentSessionId,
-            activeWindow.appName,
-            activeWindow.windowTitle
-          )
+          // Perform classification
+          const classification = classifyWindow(activeWindow.appName, activeWindow.windowTitle)
 
-          // 2. Broadcast live update to renderer process
-          this.broadcastUpdate(activeWindow)
+          // 1. Push record into local in-memory buffer
+          this.buffer.push({
+            sessionId: this.currentSessionId,
+            appName: activeWindow.appName,
+            windowTitle: activeWindow.windowTitle,
+            domain: classification.domain,
+            category: classification.category
+          })
+
+          // 2. Broadcast live update immediately to renderer process (Dashboard live dot)
+          this.broadcastUpdate({
+            appName: activeWindow.appName,
+            windowTitle: activeWindow.windowTitle,
+            domain: classification.domain,
+            category: classification.category
+          })
+
+          // 3. Flush buffer to SQLite database in a batch if batch size reached
+          if (this.buffer.length >= this.BATCH_SIZE) {
+            this.flushBuffer()
+          }
         }
       } catch (err) {
         console.error('[TelemetryPoller] Tick error:', err)
@@ -42,9 +77,12 @@ export class TelemetryPoller {
   }
 
   /**
-   * Stops active telemetry polling.
+   * Stops active telemetry polling and flushes any remaining buffered records to SQLite.
    */
   public stop(): void {
+    // Force save any remaining items in the buffer before clearing
+    this.flushBuffer()
+
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null
@@ -54,9 +92,24 @@ export class TelemetryPoller {
   }
 
   /**
+   * Writes all buffered items to SQLite using a single database transaction.
+   */
+  private flushBuffer(): void {
+    if (this.buffer.length > 0) {
+      try {
+        insertBatch(this.buffer)
+        console.log(`[TelemetryPoller] Flushed batch of ${this.buffer.length} telemetry records to database.`)
+      } catch (err) {
+        console.error('[TelemetryPoller] Failed to flush batch to database:', err)
+      }
+      this.buffer = [] // Always empty buffer after attempting insert
+    }
+  }
+
+  /**
    * Helper to send IPC event to all open renderer windows.
    */
-  private broadcastUpdate(info: ActiveWindowInfo): void {
+  private broadcastUpdate(info: BroadcastActiveWindowInfo): void {
     const windows = BrowserWindow.getAllWindows()
     for (const win of windows) {
       if (!win.isDestroyed()) {

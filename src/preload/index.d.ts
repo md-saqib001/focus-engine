@@ -77,8 +77,14 @@ interface FocusEngineAPI {
   startTelemetry: (sessionId: string) => Promise<IPCResult<void>>
   stopTelemetry: () => Promise<IPCResult<void>>
   getWindowHistory: (sessionId: string) => Promise<IPCResult<any[]>>
+  getCategoryBreakdown: (sessionId: string) => Promise<IPCResult<any[]>>
   onActiveWindowUpdate: (
-    callback: (info: { appName: string; windowTitle: string }) => void
+    callback: (info: {
+      appName: string
+      windowTitle: string
+      domain: string
+      category: 'productive' | 'distraction' | 'neutral' | 'unknown'
+    }) => void
   ) => () => void
 }
 

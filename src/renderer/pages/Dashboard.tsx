@@ -303,20 +303,51 @@ const DashboardContent: React.FC = () => {
                 style={{
                   width: '100%',
                   padding: '10px 14px',
-                  backgroundColor: 'rgba(129, 140, 248, 0.05)',
-                  border: '1.5px dashed rgba(129, 140, 248, 0.2)',
+                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                  border: '1.5px solid #1e1e2f',
                   borderRadius: '10px',
                   fontSize: '12px',
                   color: '#94a3b8',
-                  textAlign: 'center',
-                  lineHeight: '1.5',
-                  wordBreak: 'break-all'
+                  lineHeight: '1.6',
+                  wordBreak: 'break-all',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
                 }}
               >
-                <span>Currently active: </span>
-                <strong style={{ color: '#818cf8' }}>{activeWindow.appName}</strong>
-                <span style={{ color: '#475569' }}> — </span>
-                <span style={{ color: '#f8fafc' }}>{activeWindow.windowTitle}</span>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    backgroundColor:
+                      activeWindow.category === 'productive'
+                        ? '#10b981'
+                        : activeWindow.category === 'distraction'
+                        ? '#ef4444'
+                        : '#64748b',
+                    boxShadow:
+                      activeWindow.category === 'productive'
+                        ? '0 0 8px #10b981'
+                        : activeWindow.category === 'distraction'
+                        ? '0 0 8px #ef4444'
+                        : 'none'
+                  }}
+                />
+                <div style={{ textAlign: 'left', flex: 1 }}>
+                  <div>
+                    <span style={{ color: '#475569', fontWeight: 600, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active App: </span>
+                    <strong style={{ color: '#f8fafc' }}>{activeWindow.appName}</strong>
+                    {activeWindow.domain && (
+                      <span style={{ color: '#64748b', fontSize: '11px' }}> ({activeWindow.domain})</span>
+                    )}
+                  </div>
+                  <div style={{ color: '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '2px' }}>
+                    {activeWindow.windowTitle}
+                  </div>
+                </div>
               </div>
             )}
 

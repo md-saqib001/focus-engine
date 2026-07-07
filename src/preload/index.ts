@@ -120,8 +120,27 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:getWindowHistory', { sessionId })
   },
 
-  onActiveWindowUpdate: (callback: (info: { appName: string; windowTitle: string }) => void) => {
-    const subscription = (_event: any, data: { appName: string; windowTitle: string }) => callback(data)
+  getCategoryBreakdown: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:getCategoryBreakdown', { sessionId })
+  },
+
+  onActiveWindowUpdate: (
+    callback: (info: {
+      appName: string
+      windowTitle: string
+      domain: string
+      category: 'productive' | 'distraction' | 'neutral' | 'unknown'
+    }) => void
+  ) => {
+    const subscription = (
+      _event: any,
+      data: {
+        appName: string
+        windowTitle: string
+        domain: string
+        category: 'productive' | 'distraction' | 'neutral' | 'unknown'
+      }
+    ) => callback(data)
     ipcRenderer.on('telemetry:activeWindowUpdate', subscription)
     // Return unsubscribe function
     return () => {
