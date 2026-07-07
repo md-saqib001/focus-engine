@@ -1,21 +1,27 @@
 import { ipcMain } from 'electron'
 import { telemetryPoller } from '../telemetry/telemetryPoller'
 import { kpmTracker } from '../telemetry/kpmTracker'
+import { mouseMetricsTracker } from '../telemetry/mouseMetricsTracker'
 import { getWindowFocusHistory, getCategoryBreakdown } from '../database/windowFocusRepository'
 import {
-  getForSession,
+  getForSession as getKeyboardHistory,
   getAverageKPM,
   getMaxMinKPM
 } from '../database/keyboardMetricsRepository'
+import {
+  getForSession as getMouseHistory,
+  getMaxIdleDuration
+} from '../database/mouseMetricsRepository'
 
 export function registerTelemetryHandlers(): void {
-  // telemetry:start — starts telemetry window tracking + KPM tracking
+  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking
   ipcMain.handle(
     'telemetry:start',
     async (_event, args: { sessionId: string }) => {
       try {
         telemetryPoller.start(args.sessionId)
         kpmTracker.start(args.sessionId)
+        mouseMetricsTracker.start(args.sessionId)
         return { success: true }
       } catch (error: any) {
         console.error('[IPC telemetry:start]', error)
@@ -24,11 +30,12 @@ export function registerTelemetryHandlers(): void {
     }
   )
 
-  // telemetry:stop — stops telemetry window tracking + KPM tracking
+  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking
   ipcMain.handle('telemetry:stop', async () => {
     try {
       telemetryPoller.stop()
       kpmTracker.stop()
+      mouseMetricsTracker.stop()
       return { success: true }
     } catch (error: any) {
       console.error('[IPC telemetry:stop]', error)
@@ -94,7 +101,7 @@ export function registerTelemetryHandlers(): void {
     'telemetry:getKPMHistory',
     async (_event, args: { sessionId: string }) => {
       try {
-        const list = getForSession(args.sessionId)
+        const list = getKeyboardHistory(args.sessionId)
         const avg = getAverageKPM(args.sessionId)
         const bounds = getMaxMinKPM(args.sessionId)
         return {
@@ -108,6 +115,52 @@ export function registerTelemetryHandlers(): void {
         }
       } catch (error: any) {
         console.error('[IPC telemetry:getKPMHistory]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:startMouse — starts mouse metrics tracking specifically
+  ipcMain.handle(
+    'telemetry:startMouse',
+    async (_event, args: { sessionId: string }) => {
+      try {
+        mouseMetricsTracker.start(args.sessionId)
+        return { success: true }
+      } catch (error: any) {
+        console.error('[IPC telemetry:startMouse]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:stopMouse — stops mouse metrics tracking specifically
+  ipcMain.handle('telemetry:stopMouse', async () => {
+    try {
+      mouseMetricsTracker.stop()
+      return { success: true }
+    } catch (error: any) {
+      console.error('[IPC telemetry:stopMouse]', error)
+      return { success: false, error: error.message || String(error) }
+    }
+  })
+
+  // telemetry:getMouseHistory — retrieves mouse metrics log and max idle stats for a session
+  ipcMain.handle(
+    'telemetry:getMouseHistory',
+    async (_event, args: { sessionId: string }) => {
+      try {
+        const list = getMouseHistory(args.sessionId)
+        const maxIdle = getMaxIdleDuration(args.sessionId)
+        return {
+          success: true,
+          data: {
+            history: list,
+            maxIdleSeconds: maxIdle
+          }
+        }
+      } catch (error: any) {
+        console.error('[IPC telemetry:getMouseHistory]', error)
         return { success: false, error: error.message || String(error) }
       }
     }

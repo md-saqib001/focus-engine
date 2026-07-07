@@ -86,6 +86,12 @@ interface FocusEngineAPI {
     maxKpm: number
     minKpm: number
   }>>
+  startMouse: (sessionId: string) => Promise<IPCResult<void>>
+  stopMouse: () => Promise<IPCResult<void>>
+  getMouseHistory: (sessionId: string) => Promise<IPCResult<{
+    history: any[]
+    maxIdleSeconds: number
+  }>>
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
@@ -95,6 +101,12 @@ interface FocusEngineAPI {
     }) => void
   ) => () => void
   onKpmUpdate: (callback: (kpm: number) => void) => () => void
+  onActivityUpdate: (
+    callback: (info: {
+      status: 'Active' | 'Idle'
+      idleSeconds: number
+    }) => void
+  ) => () => void
 }
 
 declare global {

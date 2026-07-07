@@ -1,5 +1,6 @@
 // @ts-ignore
 import { GlobalKeyboardListener } from 'node-global-key-listener'
+import { activityTimestampTracker } from './activityTimestampTracker'
 
 export class KeystrokeCounter {
   private listener: any = null
@@ -23,6 +24,7 @@ export class KeystrokeCounter {
           // The key code, character value, or name (e.g. e.name) is NEVER
           // assigned, stored, logged, or processed to guarantee zero keylogging capability.
           this.count++
+          activityTimestampTracker.updateActivity()
         }
       })
       console.log('[KeystrokeCounter] Global key hook registered.')

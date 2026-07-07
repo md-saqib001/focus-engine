@@ -136,6 +136,18 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:getKPMHistory', { sessionId })
   },
 
+  startMouse: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:startMouse', { sessionId })
+  },
+
+  stopMouse: () => {
+    return ipcRenderer.invoke('telemetry:stopMouse')
+  },
+
+  getMouseHistory: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:getMouseHistory', { sessionId })
+  },
+
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
@@ -165,6 +177,14 @@ const focusEngineAPI = {
     ipcRenderer.on('telemetry:kpmUpdate', subscription)
     return () => {
       ipcRenderer.removeListener('telemetry:kpmUpdate', subscription)
+    }
+  },
+
+  onActivityUpdate: (callback: (info: { status: 'Active' | 'Idle'; idleSeconds: number }) => void) => {
+    const subscription = (_event: any, data: { status: 'Active' | 'Idle'; idleSeconds: number }) => callback(data)
+    ipcRenderer.on('telemetry:activityUpdate', subscription)
+    return () => {
+      ipcRenderer.removeListener('telemetry:activityUpdate', subscription)
     }
   }
 }

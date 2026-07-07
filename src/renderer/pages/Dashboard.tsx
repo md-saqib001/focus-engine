@@ -20,6 +20,7 @@ const DashboardContent: React.FC = () => {
     summary,
     activeWindow,
     kpm,
+    activity,
     startPomodoroSession,
     startStandardSession,
     pauseSession,
@@ -324,6 +325,50 @@ const DashboardContent: React.FC = () => {
                       color: kpm < 10 ? '#94a3b8' : kpm <= 60 ? '#10b981' : '#a855f7' 
                     }}>
                       {kpm} ({kpm < 10 ? 'Reading' : kpm <= 60 ? 'Writing' : 'Coding'})
+                    </strong>
+                  </span>
+                </div>
+
+                {/* Separator */}
+                <div style={{ borderLeft: '1px solid #232336' }} />
+
+                {/* Live Activity Tracker */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        activity.status === 'Active' || activity.idleSeconds < 60
+                          ? '#10b981'
+                          : activity.idleSeconds <= 300
+                          ? '#f59e0b'
+                          : '#ef4444',
+                      boxShadow:
+                        activity.status === 'Active' || activity.idleSeconds < 60
+                          ? '0 0 6px #10b981'
+                          : activity.idleSeconds <= 300
+                          ? '0 0 6px #f59e0b'
+                          : '0 0 6px #ef4444'
+                    }}
+                  />
+                  <span>
+                    Activity:{' '}
+                    <strong
+                      style={{
+                        color:
+                          activity.status === 'Active' || activity.idleSeconds < 60
+                            ? '#10b981'
+                            : activity.idleSeconds <= 300
+                            ? '#f59e0b'
+                            : '#ef4444'
+                      }}
+                    >
+                      {activity.status === 'Active' || activity.idleSeconds < 5
+                        ? 'Active'
+                        : `Idle ${Math.floor(activity.idleSeconds / 60)}m ${activity.idleSeconds % 60}s`}
                     </strong>
                   </span>
                 </div>

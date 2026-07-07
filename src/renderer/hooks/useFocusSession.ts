@@ -29,6 +29,10 @@ export const useFocusSession = () => {
     category: 'productive' | 'distraction' | 'neutral' | 'unknown'
   } | null>(null)
   const [kpm, setKpm] = useState<number>(0)
+  const [activity, setActivity] = useState<{ status: 'Active' | 'Idle'; idleSeconds: number }>({
+    status: 'Active',
+    idleSeconds: 0
+  })
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')
@@ -41,6 +45,7 @@ export const useFocusSession = () => {
       await window.focusEngineAPI.stopTelemetry()
       setActiveWindow(null)
       setKpm(0)
+      setActivity({ status: 'Active', idleSeconds: 0 })
     } catch (err) {
       console.error('[useFocusSession] stopTelemetry failed:', err)
     }
@@ -64,9 +69,13 @@ export const useFocusSession = () => {
     const unsubscribeKpm = window.focusEngineAPI.onKpmUpdate((kpmVal) => {
       setKpm(kpmVal)
     })
+    const unsubscribeActivity = window.focusEngineAPI.onActivityUpdate((act) => {
+      setActivity(act)
+    })
     return () => {
       unsubscribe()
       unsubscribeKpm()
+      unsubscribeActivity()
     }
   }, [])
 
@@ -328,6 +337,7 @@ export const useFocusSession = () => {
     setBlockingError(null)
     setBlockingStatus('idle')
     setKpm(0)
+    setActivity({ status: 'Active', idleSeconds: 0 })
   }, [timer])
 
   return {
@@ -345,6 +355,7 @@ export const useFocusSession = () => {
     summary,
     activeWindow,
     kpm,
+    activity,
     startPomodoroSession,
     startStandardSession,
     pauseSession,
