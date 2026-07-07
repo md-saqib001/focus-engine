@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card, TimerDisplay, Button } from '@/components/ui'
 import { useFocusSessionContext } from '../context/FocusSessionContext'
+import LiveTelemetryPanel from '../components/LiveTelemetryPanel'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { Play, Pause, Square, RotateCcw, X, ShieldAlert, CheckCircle, AlertCircle } from 'lucide-react'
 import { SessionType } from '../types/timer'
@@ -9,18 +10,14 @@ const DashboardContent: React.FC = () => {
   const {
     mode,
     setMode,
+    sessionId,
     timerState,
     hoursElapsedOrRemaining,
     minutesElapsedOrRemaining,
     secondsElapsedOrRemaining,
     progress,
-    blockingStatus,
     blockingError,
-    appsKilled,
     summary,
-    activeWindow,
-    kpm,
-    activity,
     startPomodoroSession,
     startStandardSession,
     pauseSession,
@@ -151,8 +148,8 @@ const DashboardContent: React.FC = () => {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-        <Card title={mode === 'pomodoro' ? 'Pomodoro Session' : 'Standard Focus Session'} style={{ width: '100%', maxWidth: '460px' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', gap: '24px', width: '100%', maxWidth: '960px', margin: '0 auto' }}>
+        <Card title={mode === 'pomodoro' ? 'Pomodoro Session' : 'Standard Focus Session'} style={{ width: '100%', maxWidth: '460px', flex: '1 1 360px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', padding: '12px 0' }}>
             
             {/* Mode Selector (Only visible when idle or completed) */}
@@ -250,184 +247,7 @@ const DashboardContent: React.FC = () => {
               progress={progress}
             />
 
-            {/* Status Information Row (Active/Inactive blocking, Apps Killed) */}
-            {timerState !== 'idle' && timerState !== 'completed' && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-around',
-                  width: '100%',
-                  padding: '8px 12px',
-                  backgroundColor: '#0f0f17',
-                  borderRadius: '10px',
-                  border: '1px solid #1e1e2f',
-                  fontSize: '13px'
-                }}
-              >
-                {/* Blocking Status */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        blockingStatus === 'blocking'
-                          ? '#10b981'
-                          : blockingStatus === 'error'
-                          ? '#ef4444'
-                          : '#64748b'
-                    }}
-                  />
-                  <span style={{ color: '#94a3b8' }}>
-                    Blocking:{' '}
-                    <strong style={{ color: blockingStatus === 'blocking' ? '#10b981' : blockingStatus === 'error' ? '#ef4444' : '#94a3b8' }}>
-                      {blockingStatus === 'blocking' ? 'Active' : blockingStatus === 'error' ? 'Error' : 'Inactive'}
-                    </strong>
-                  </span>
-                </div>
 
-                {/* Separator */}
-                <div style={{ borderLeft: '1px solid #232336' }} />
-
-                {/* Apps Killed Count */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
-                  <span>
-                    Apps Terminated: <strong style={{ color: appsKilled.length > 0 ? '#818cf8' : '#94a3b8' }}>{appsKilled.length}</strong>
-                  </span>
-                </div>
-
-                {/* Separator */}
-                <div style={{ borderLeft: '1px solid #232336' }} />
-
-                {/* Live KPM Tracker */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        kpm < 10
-                          ? '#64748b'
-                          : kpm <= 60
-                          ? '#10b981'
-                          : '#a855f7',
-                      boxShadow:
-                        kpm >= 10
-                          ? `0 0 6px ${kpm <= 60 ? '#10b981' : '#a855f7'}`
-                          : 'none'
-                    }}
-                  />
-                  <span>
-                    KPM: <strong style={{ 
-                      color: kpm < 10 ? '#94a3b8' : kpm <= 60 ? '#10b981' : '#a855f7' 
-                    }}>
-                      {kpm} ({kpm < 10 ? 'Reading' : kpm <= 60 ? 'Writing' : 'Coding'})
-                    </strong>
-                  </span>
-                </div>
-
-                {/* Separator */}
-                <div style={{ borderLeft: '1px solid #232336' }} />
-
-                {/* Live Activity Tracker */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
-                  <span
-                    style={{
-                      display: 'inline-block',
-                      width: '6px',
-                      height: '6px',
-                      borderRadius: '50%',
-                      backgroundColor:
-                        activity.status === 'Active' || activity.idleSeconds < 60
-                          ? '#10b981'
-                          : activity.idleSeconds <= 300
-                          ? '#f59e0b'
-                          : '#ef4444',
-                      boxShadow:
-                        activity.status === 'Active' || activity.idleSeconds < 60
-                          ? '0 0 6px #10b981'
-                          : activity.idleSeconds <= 300
-                          ? '0 0 6px #f59e0b'
-                          : '0 0 6px #ef4444'
-                    }}
-                  />
-                  <span>
-                    Activity:{' '}
-                    <strong
-                      style={{
-                        color:
-                          activity.status === 'Active' || activity.idleSeconds < 60
-                            ? '#10b981'
-                            : activity.idleSeconds <= 300
-                            ? '#f59e0b'
-                            : '#ef4444'
-                      }}
-                    >
-                      {activity.status === 'Active' || activity.idleSeconds < 5
-                        ? 'Active'
-                        : `Idle ${Math.floor(activity.idleSeconds / 60)}m ${activity.idleSeconds % 60}s`}
-                    </strong>
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Live Active Window indicator */}
-            {timerState !== 'idle' && timerState !== 'completed' && activeWindow && (
-              <div
-                style={{
-                  width: '100%',
-                  padding: '10px 14px',
-                  backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                  border: '1.5px solid #1e1e2f',
-                  borderRadius: '10px',
-                  fontSize: '12px',
-                  color: '#94a3b8',
-                  lineHeight: '1.6',
-                  wordBreak: 'break-all',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px'
-                }}
-              >
-                <span
-                  style={{
-                    display: 'inline-block',
-                    width: '8px',
-                    height: '8px',
-                    borderRadius: '50%',
-                    flexShrink: 0,
-                    backgroundColor:
-                      activeWindow.category === 'productive'
-                        ? '#10b981'
-                        : activeWindow.category === 'distraction'
-                        ? '#ef4444'
-                        : '#64748b',
-                    boxShadow:
-                      activeWindow.category === 'productive'
-                        ? '0 0 8px #10b981'
-                        : activeWindow.category === 'distraction'
-                        ? '0 0 8px #ef4444'
-                        : 'none'
-                  }}
-                />
-                <div style={{ textAlign: 'left', flex: 1 }}>
-                  <div>
-                    <span style={{ color: '#475569', fontWeight: 600, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Active App: </span>
-                    <strong style={{ color: '#f8fafc' }}>{activeWindow.appName}</strong>
-                    {activeWindow.domain && (
-                      <span style={{ color: '#64748b', fontSize: '11px' }}> ({activeWindow.domain})</span>
-                    )}
-                  </div>
-                  <div style={{ color: '#64748b', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', marginTop: '2px' }}>
-                    {activeWindow.windowTitle}
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Controls */}
             <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
@@ -467,6 +287,12 @@ const DashboardContent: React.FC = () => {
             </div>
           </div>
         </Card>
+
+        {/* Live diagnostics panel shown during active focus sessions */}
+        <LiveTelemetryPanel
+          sessionId={sessionId}
+          isActive={timerState === 'running' || timerState === 'paused'}
+        />
       </div>
 
       {/* Session Summary Modal */}

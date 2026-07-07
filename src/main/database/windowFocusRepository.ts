@@ -81,7 +81,7 @@ export function getCategoryBreakdown(sessionId: string): CategoryBreakdown[] {
  * Inserts a batch of window focus records within a single database transaction.
  */
 export function insertBatch(
-  records: { sessionId: string; appName: string; windowTitle: string; domain: string; category: string }[]
+  records: { sessionId: string; appName: string; windowTitle: string; domain: string; category: string; timestamp: number }[]
 ): void {
   if (records.length === 0) return
   const db = getDatabase()
@@ -91,7 +91,7 @@ export function insertBatch(
   `)
   const transaction = db.transaction((rows) => {
     for (const r of rows) {
-      insertStmt.run(r.sessionId, r.appName, r.windowTitle, r.domain, r.category, Date.now())
+      insertStmt.run(r.sessionId, r.appName, r.windowTitle, r.domain, r.category, r.timestamp)
     }
   })
   transaction(records)

@@ -156,6 +156,14 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:validateSession', { sessionId })
   },
 
+  getLatestWindow: () => {
+    return ipcRenderer.invoke('telemetry:getLatestWindow')
+  },
+
+  getLiveMouseCounts: () => {
+    return ipcRenderer.invoke('telemetry:getLiveMouseCounts')
+  },
+
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string

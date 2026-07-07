@@ -14,6 +14,9 @@ import {
 } from '../database/mouseMetricsRepository'
 import { getSessionTelemetrySummary } from '../database/telemetryAggregator'
 import { validateSession } from '../telemetry/validateTelemetry'
+import { getActiveWindow } from '../telemetry/activeWindowTracker'
+import { classifyWindow } from '../telemetry/domainClassifier'
+import { mouseTracker } from '../telemetry/mouseTracker'
 
 export function registerTelemetryHandlers(): void {
   // telemetry:start — starts window tracking + KPM tracking + Mouse tracking
@@ -191,6 +194,46 @@ export function registerTelemetryHandlers(): void {
         return { success: true, data: result }
       } catch (error: any) {
         console.error('[IPC telemetry:validateSession]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:getLatestWindow — queries active window on-demand and returns domain + category classification
+  ipcMain.handle(
+    'telemetry:getLatestWindow',
+    async () => {
+      try {
+        const activeWindow = await getActiveWindow()
+        if (activeWindow) {
+          const classification = classifyWindow(activeWindow.appName, activeWindow.windowTitle)
+          return {
+            success: true,
+            data: {
+              appName: activeWindow.appName,
+              windowTitle: activeWindow.windowTitle,
+              domain: classification.domain,
+              category: classification.category
+            }
+          }
+        }
+        return { success: true, data: null }
+      } catch (error: any) {
+        console.error('[IPC telemetry:getLatestWindow]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:getLiveMouseCounts — returns current click and movement counts from mouseTracker
+  ipcMain.handle(
+    'telemetry:getLiveMouseCounts',
+    async () => {
+      try {
+        const counts = mouseTracker.getCounts()
+        return { success: true, data: counts }
+      } catch (error: any) {
+        console.error('[IPC telemetry:getLiveMouseCounts]', error)
         return { success: false, error: error.message || String(error) }
       }
     }

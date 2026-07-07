@@ -98,6 +98,16 @@ interface FocusEngineAPI {
     errors: string[]
     warnings: string[]
   }>>
+  getLatestWindow: () => Promise<IPCResult<{
+    appName: string
+    windowTitle: string
+    domain: string
+    category: 'productive' | 'distraction' | 'neutral' | 'unknown'
+  } | null>>
+  getLiveMouseCounts: () => Promise<IPCResult<{
+    clicks: number
+    movements: number
+  }>>
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string

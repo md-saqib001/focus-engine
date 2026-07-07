@@ -21,6 +21,7 @@ export class TelemetryPoller {
     windowTitle: string
     domain: string
     category: string
+    timestamp: number
   }[] = []
 
   private readonly BATCH_SIZE = 12
@@ -42,6 +43,7 @@ export class TelemetryPoller {
         if (activeWindow && this.currentSessionId) {
           // Perform classification
           const classification = classifyWindow(activeWindow.appName, activeWindow.windowTitle)
+          const now = Date.now()
 
           // 1. Push record into local in-memory buffer
           this.buffer.push({
@@ -49,7 +51,8 @@ export class TelemetryPoller {
             appName: activeWindow.appName,
             windowTitle: activeWindow.windowTitle,
             domain: classification.domain,
-            category: classification.category
+            category: classification.category,
+            timestamp: now
           })
 
           // 2. Broadcast live update immediately to renderer process (Dashboard live dot)
