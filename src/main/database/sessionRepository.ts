@@ -67,9 +67,9 @@ export function saveSession(params: {
         `(received: ${durationPlannedSec}).`
       )
     }
-    if (sessionType !== null) {
+    if (sessionType !== null && sessionType !== 'focus') {
       throw new Error(
-        `[SessionRepository] Standard session must NOT have a sessionType ` +
+        `[SessionRepository] Standard session sessionType must be null or 'focus' ` +
         `(received: ${sessionType}).`
       )
     }

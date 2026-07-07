@@ -124,6 +124,18 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:getCategoryBreakdown', { sessionId })
   },
 
+  startKPM: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:startKPM', { sessionId })
+  },
+
+  stopKPM: () => {
+    return ipcRenderer.invoke('telemetry:stopKPM')
+  },
+
+  getKPMHistory: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:getKPMHistory', { sessionId })
+  },
+
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
@@ -145,6 +157,14 @@ const focusEngineAPI = {
     // Return unsubscribe function
     return () => {
       ipcRenderer.removeListener('telemetry:activeWindowUpdate', subscription)
+    }
+  },
+
+  onKpmUpdate: (callback: (kpm: number) => void) => {
+    const subscription = (_event: any, kpm: number) => callback(kpm)
+    ipcRenderer.on('telemetry:kpmUpdate', subscription)
+    return () => {
+      ipcRenderer.removeListener('telemetry:kpmUpdate', subscription)
     }
   }
 }

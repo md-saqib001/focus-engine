@@ -25,6 +25,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "better-sqlite3": "^12.11.1",
     "lucide-react": "^1.21.0",
+    "node-global-key-listener": "^0.3.0",
     "react-router-dom": "^7.18.0"
   },
   "devDependencies": {

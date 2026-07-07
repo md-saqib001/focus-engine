@@ -78,6 +78,14 @@ interface FocusEngineAPI {
   stopTelemetry: () => Promise<IPCResult<void>>
   getWindowHistory: (sessionId: string) => Promise<IPCResult<any[]>>
   getCategoryBreakdown: (sessionId: string) => Promise<IPCResult<any[]>>
+  startKPM: (sessionId: string) => Promise<IPCResult<void>>
+  stopKPM: () => Promise<IPCResult<void>>
+  getKPMHistory: (sessionId: string) => Promise<IPCResult<{
+    history: any[]
+    average: number
+    maxKpm: number
+    minKpm: number
+  }>>
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
@@ -86,6 +94,7 @@ interface FocusEngineAPI {
       category: 'productive' | 'distraction' | 'neutral' | 'unknown'
     }) => void
   ) => () => void
+  onKpmUpdate: (callback: (kpm: number) => void) => () => void
 }
 
 declare global {

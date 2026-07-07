@@ -112,6 +112,21 @@ export function getDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_window_focus_session_id ON window_focus(session_id);
   `)
 
+  // Create keyboard_metrics table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS keyboard_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      kpm INTEGER NOT NULL,
+      timestamp INTEGER NOT NULL
+    );
+  `)
+
+  // Create index on keyboard_metrics session_id
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_keyboard_metrics_session_id ON keyboard_metrics(session_id);
+  `)
+
   // Seed blocked_domains if empty
   const domainCount = db.prepare('SELECT COUNT(*) as count FROM blocked_domains').get() as { count: number }
   if (domainCount.count === 0) {

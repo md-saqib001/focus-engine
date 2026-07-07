@@ -28,6 +28,7 @@ export const useFocusSession = () => {
     domain: string
     category: 'productive' | 'distraction' | 'neutral' | 'unknown'
   } | null>(null)
+  const [kpm, setKpm] = useState<number>(0)
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')
@@ -39,6 +40,7 @@ export const useFocusSession = () => {
     try {
       await window.focusEngineAPI.stopTelemetry()
       setActiveWindow(null)
+      setKpm(0)
     } catch (err) {
       console.error('[useFocusSession] stopTelemetry failed:', err)
     }
@@ -59,8 +61,12 @@ export const useFocusSession = () => {
     const unsubscribe = window.focusEngineAPI.onActiveWindowUpdate((info) => {
       setActiveWindow(info)
     })
+    const unsubscribeKpm = window.focusEngineAPI.onKpmUpdate((kpmVal) => {
+      setKpm(kpmVal)
+    })
     return () => {
       unsubscribe()
+      unsubscribeKpm()
     }
   }, [])
 
@@ -83,6 +89,16 @@ export const useFocusSession = () => {
     const actualDuration = getElapsedSeconds()
     const endTime = Date.now()
 
+    console.log('[finalizeSession] debug:', {
+      mode,
+      sessionType,
+      sessionStartTime,
+      endTime,
+      elapsedMs: endTime - sessionStartTime,
+      actualDuration,
+      getElapsedSecondsVal: getElapsedSeconds()
+    })
+
     // Stop blocking system file writes
     await performBlockingCleanup()
 
@@ -102,6 +118,7 @@ export const useFocusSession = () => {
         : {
             sessionId: sessionIdRef.current,
             mode: 'standard' as const,
+            sessionType: 'focus' as const,
             startTime: sessionStartTime,
             endTime,
             durationActualSec: actualDuration,
@@ -289,14 +306,14 @@ export const useFocusSession = () => {
     await finalizeSession(completed, endReason)
   }, [timer, finalizeSession])
 
-  // Reset session (pomodoro-only, standard will warn and no-op)
   const resetSession = useCallback(async () => {
     if (timer.mode === 'standard') {
       console.warn('[useFocusSession] Warning: resetSession is a no-op in standard mode. Standard sessions must be stopped using stopSession.')
       return
     }
-    timer.reset()
+    // Finalize session first while we still have the elapsed timer context
     await finalizeSession(false, 'abandoned')
+    timer.reset()
   }, [timer, finalizeSession])
 
   const clearSummary = useCallback(() => {
@@ -310,6 +327,7 @@ export const useFocusSession = () => {
     setAppsKilled([])
     setBlockingError(null)
     setBlockingStatus('idle')
+    setKpm(0)
   }, [timer])
 
   return {
@@ -326,6 +344,7 @@ export const useFocusSession = () => {
     appsKilled,
     summary,
     activeWindow,
+    kpm,
     startPomodoroSession,
     startStandardSession,
     pauseSession,

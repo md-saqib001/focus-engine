@@ -19,6 +19,7 @@ const DashboardContent: React.FC = () => {
     appsKilled,
     summary,
     activeWindow,
+    kpm,
     startPomodoroSession,
     startStandardSession,
     pauseSession,
@@ -292,6 +293,38 @@ const DashboardContent: React.FC = () => {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
                   <span>
                     Apps Terminated: <strong style={{ color: appsKilled.length > 0 ? '#818cf8' : '#94a3b8' }}>{appsKilled.length}</strong>
+                  </span>
+                </div>
+
+                {/* Separator */}
+                <div style={{ borderLeft: '1px solid #232336' }} />
+
+                {/* Live KPM Tracker */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#94a3b8' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '6px',
+                      height: '6px',
+                      borderRadius: '50%',
+                      backgroundColor:
+                        kpm < 10
+                          ? '#64748b'
+                          : kpm <= 60
+                          ? '#10b981'
+                          : '#a855f7',
+                      boxShadow:
+                        kpm >= 10
+                          ? `0 0 6px ${kpm <= 60 ? '#10b981' : '#a855f7'}`
+                          : 'none'
+                    }}
+                  />
+                  <span>
+                    KPM: <strong style={{ 
+                      color: kpm < 10 ? '#94a3b8' : kpm <= 60 ? '#10b981' : '#a855f7' 
+                    }}>
+                      {kpm} ({kpm < 10 ? 'Reading' : kpm <= 60 ? 'Writing' : 'Coding'})
+                    </strong>
                   </span>
                 </div>
               </div>
