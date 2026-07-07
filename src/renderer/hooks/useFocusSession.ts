@@ -44,11 +44,22 @@ export const useFocusSession = () => {
   const performBlockingCleanup = useCallback(async () => {
     try {
       await window.focusEngineAPI.stopTelemetry()
+      await window.focusEngineAPI.stopCV()
+      
+      if (sessionIdRef.current) {
+        const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
+        if (cvEnabledRes.success && cvEnabledRes.data) {
+          // Trigger summary generation and DB cleanup
+          const summaryRes = await window.focusEngineAPI.getCVSummary(sessionIdRef.current)
+          console.log('[useFocusSession] CV Summary:', summaryRes)
+        }
+      }
+      
       setActiveWindow(null)
       setKpm(0)
       setActivity({ status: 'Active', idleSeconds: 0 })
     } catch (err) {
-      console.error('[useFocusSession] stopTelemetry failed:', err)
+      console.error('[useFocusSession] stopTelemetry or stopCV failed:', err)
     }
 
     if (isBlockingSessionRef.current) {
@@ -265,11 +276,17 @@ export const useFocusSession = () => {
       }
     }
 
-    // Start active window tracking telemetry
+    // Start active window tracking telemetry and CV Engine
     try {
       await window.focusEngineAPI.startTelemetry(sessionIdRef.current)
+      const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
+      if (cvEnabledRes.success && cvEnabledRes.data) {
+        await window.focusEngineAPI.startCV(sessionIdRef.current)
+      } else {
+        console.log('[useFocusSession] Webcam attention tracking is disabled in settings. Skipping startCV.')
+      }
     } catch (err) {
-      console.error('[useFocusSession] Failed to start telemetry:', err)
+      console.error('[useFocusSession] Failed to start telemetry/CV:', err)
     }
 
     timer.startPomodoro(type, durationMinutes)
@@ -307,11 +324,17 @@ export const useFocusSession = () => {
       console.error('[useFocusSession] Failed to kill blacklisted apps:', err)
     }
 
-    // Start active window tracking telemetry
+    // Start active window tracking telemetry and CV Engine
     try {
       await window.focusEngineAPI.startTelemetry(sessionIdRef.current)
+      const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
+      if (cvEnabledRes.success && cvEnabledRes.data) {
+        await window.focusEngineAPI.startCV(sessionIdRef.current)
+      } else {
+        console.log('[useFocusSession] Webcam attention tracking is disabled in settings. Skipping startCV.')
+      }
     } catch (err) {
-      console.error('[useFocusSession] Failed to start telemetry:', err)
+      console.error('[useFocusSession] Failed to start telemetry/CV:', err)
     }
 
     timer.startStandard()

@@ -7,19 +7,21 @@ import { registerSessionHandlers } from './ipc/sessionHandlers'
 import { registerBlockingHandlers } from './ipc/blockingHandlers'
 import { registerAppBlockingHandlers } from './ipc/appBlockingHandlers'
 import { registerTelemetryHandlers } from './ipc/telemetryHandlers'
+import { registerCVHandlers } from './ipc/cvHandlers'
 import { restoreHostsSync } from './blocking/hostsFileManager'
 
 function createWindow(): void {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: 900,
+    height: 670,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      contextIsolation: true
     }
   })
 
@@ -66,6 +68,7 @@ app.whenReady().then(() => {
   registerBlockingHandlers()
   registerAppBlockingHandlers()
   registerTelemetryHandlers()
+  registerCVHandlers()
 
   createWindow()
 

@@ -73,6 +73,28 @@ interface FocusEngineAPI {
   removeBlacklistedApp: (appName: string) => Promise<IPCResult<void>>
   toggleBlacklistedApp: (appName: string, enabled: boolean) => Promise<IPCResult<void>>
 
+  // CV Engine endpoints
+  startCV: (sessionId: string, fps?: number) => Promise<IPCResult<void>>
+  stopCV: () => Promise<IPCResult<void>>
+  getCVSummary: (sessionId: string) => Promise<IPCResult<{
+    session_id: string
+    avg_attention_score: number
+    min_attention_score: number
+    face_present_pct: number
+  } | null>>
+  getCVEnabled: () => Promise<IPCResult<boolean>>
+  setCVEnabled: (enabled: boolean) => Promise<IPCResult<void>>
+  getCVPermission: () => Promise<IPCResult<'granted' | 'denied' | 'pending'>>
+  setCVPermission: (permission: 'granted' | 'denied' | 'pending') => Promise<IPCResult<void>>
+  getCalibration: () => Promise<IPCResult<{
+    screen: { yaw: number; pitch: number }
+    distract: { yaw: number; pitch: number }
+  } | null>>
+  setCalibration: (calibration: {
+    screen: { yaw: number; pitch: number }
+    distract: { yaw: number; pitch: number }
+  }) => Promise<IPCResult<void>>
+
   // Telemetry endpoints
   startTelemetry: (sessionId: string) => Promise<IPCResult<void>>
   stopTelemetry: () => Promise<IPCResult<void>>
@@ -152,6 +174,21 @@ interface FocusEngineAPI {
       mouse: boolean
     }) => void
   ) => () => void
+  onCVUpdate: (
+    callback: (data: {
+      face_present: boolean
+      yaw: number | null
+      pitch: number | null
+      roll: number | null
+      gaze_direction: string | null
+      looking_at_screen: boolean
+      raw_attention_score: number
+      smoothed_attention_score: number
+      ts: number
+      frame: number
+    }) => void
+  ) => () => void
+  onCVError: (callback: (error: string) => void) => () => void
 }
 
 declare global {

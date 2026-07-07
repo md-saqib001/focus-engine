@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Button } from '@/components/ui'
-import { Trash2, Plus, Globe, ShieldAlert, Laptop } from 'lucide-react'
+import { Trash2, Plus, Globe, ShieldAlert, Laptop, Camera, ShieldCheck, UserCheck } from 'lucide-react'
+import CVCalibrationHelper from '../components/CVCalibrationHelper'
 
 interface BlockedDomainRow {
   domain: string
@@ -23,6 +24,26 @@ const Settings: React.FC = () => {
   const [apps, setApps] = useState<BlacklistedAppRow[]>([])
   const [newApp, setNewApp] = useState('')
   const [loading, setLoading] = useState(true)
+
+  // CV Settings states
+  const [cvEnabled, setCvEnabled] = useState(true)
+  const [showCalibration, setShowCalibration] = useState(false)
+  const [calibrationData, setCalibrationData] = useState<any>(null)
+
+  const fetchCVSettings = async (): Promise<void> => {
+    try {
+      const enabledRes = await window.focusEngineAPI.getCVEnabled()
+      if (enabledRes.success && enabledRes.data !== undefined) {
+        setCvEnabled(enabledRes.data)
+      }
+      const calibrationRes = await window.focusEngineAPI.getCalibration()
+      if (calibrationRes.success) {
+        setCalibrationData(calibrationRes.data)
+      }
+    } catch (err) {
+      console.error('[Settings] Fetch CV settings error:', err)
+    }
+  }
 
   const fetchDomains = async (): Promise<void> => {
     try {
@@ -49,7 +70,7 @@ const Settings: React.FC = () => {
   useEffect(() => {
     const init = async (): Promise<void> => {
       setLoading(true)
-      await Promise.all([fetchDomains(), fetchApps()])
+      await Promise.all([fetchDomains(), fetchApps(), fetchCVSettings()])
       setLoading(false)
     }
     init()
@@ -149,6 +170,21 @@ const Settings: React.FC = () => {
         await fetchApps()
       } else {
         setError(res.error || 'Failed to toggle app')
+      }
+    } catch (err: any) {
+      setError(err.message || String(err))
+    }
+  }
+
+  const handleToggleCV = async (): Promise<void> => {
+    setError(null)
+    try {
+      const nextVal = !cvEnabled
+      const res = await window.focusEngineAPI.setCVEnabled(nextVal)
+      if (res.success) {
+        setCvEnabled(nextVal)
+      } else {
+        setError(res.error || 'Failed to toggle camera tracking')
       }
     } catch (err: any) {
       setError(err.message || String(err))
@@ -422,6 +458,102 @@ const Settings: React.FC = () => {
           )}
         </div>
       </Card>
+
+      {/* Webcam Attention Tracking Card */}
+      <Card title="Attention Tracking (Webcam)">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '8px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <strong style={{ display: 'block', fontSize: '14px', color: '#f8fafc' }}>
+                Enable Webcam Attention Tracking
+              </strong>
+              <span style={{ fontSize: '13px', color: '#64748b', marginTop: '2px', display: 'block' }}>
+                Uses local face and gaze telemetry to detect distraction in real time.
+              </span>
+            </div>
+            <button
+              onClick={handleToggleCV}
+              style={{
+                width: '40px',
+                height: '22px',
+                borderRadius: '11px',
+                backgroundColor: cvEnabled ? '#818cf8' : '#232336',
+                border: 'none',
+                cursor: 'pointer',
+                position: 'relative',
+                transition: 'background-color 0.2s ease',
+                padding: 0
+              }}
+            >
+              <div
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  borderRadius: '50%',
+                  backgroundColor: '#ffffff',
+                  position: 'absolute',
+                  top: '3px',
+                  left: cvEnabled ? '21px' : '3px',
+                  transition: 'left 0.2s ease'
+                }}
+              />
+            </button>
+          </div>
+
+          {cvEnabled && (
+            <div style={{ borderTop: '1px solid #1e1e2f', paddingTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <strong style={{ display: 'block', fontSize: '14px', color: '#f8fafc' }}>
+                  Camera Baseline Calibration
+                </strong>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 10px 0', lineHeight: '1.5' }}>
+                  Custom baselines align the gaze tracker to your setup. Recalibrate if you adjust your camera position or monitor angle.
+                </p>
+
+                {calibrationData ? (
+                  <div style={{ padding: '12px', backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}>
+                    <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '6px' }}>
+                      <UserCheck size={16} style={{ color: '#10b981' }} />
+                      <strong>Baseline Calibration Found</strong>
+                    </div>
+                    <div>• <strong>Active Screen</strong>: Yaw {calibrationData.screen.yaw}°, Pitch {calibrationData.screen.pitch}°</div>
+                    <div>• <strong>Distraction (Phone/Lap)</strong>: Yaw {calibrationData.distract.yaw}°, Pitch {calibrationData.distract.pitch}°</div>
+                  </div>
+                ) : (
+                  <div style={{ padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.05)', border: '1px dashed #f59e0b', borderRadius: '8px', fontSize: '12px', color: '#fef3c7', display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <Camera size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                    <span>No custom baselines detected. Run calibration to improve distraction detection accuracy.</span>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex' }}>
+                <Button variant="secondary" size="md" onClick={() => setShowCalibration(true)}>
+                  <Camera size={14} style={{ marginRight: '6px' }} />
+                  <span>{calibrationData ? 'Recalibrate Tracker' : 'Calibrate Tracker'}</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <div style={{ backgroundColor: '#0f0f17', borderRadius: '8px', padding: '12px', display: 'flex', gap: '10px', fontSize: '12px', color: '#64748b', border: '1px solid #1e1e2f' }}>
+            <ShieldCheck size={16} style={{ color: '#10b981', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ lineHeight: '1.5' }}>
+              <strong>Webcam Privacy Policy</strong>: Webcam feeds are analyzed in-memory purely locally on your machine. No frames or video files are ever saved, archived, or transmitted over any network. Only numeric landmarks leave the subprocess.
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* Calibration Helper Overlay */}
+      {showCalibration && (
+        <CVCalibrationHelper
+          onClose={() => {
+            setShowCalibration(false)
+            fetchCVSettings()
+          }}
+        />
+      )}
     </div>
   )
 }

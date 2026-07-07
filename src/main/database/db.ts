@@ -160,6 +160,46 @@ export function getDatabase(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_distraction_events_session_id ON distraction_events(session_id);
   `)
 
+  // Create cv_metrics table (raw telemetry, short-lived)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cv_metrics (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      face_present INTEGER NOT NULL,
+      yaw REAL,
+      pitch REAL,
+      roll REAL,
+      gaze_direction TEXT,
+      looking_at_screen INTEGER NOT NULL,
+      raw_attention_score REAL NOT NULL,
+      smoothed_attention_score REAL NOT NULL,
+      timestamp INTEGER NOT NULL
+    );
+  `)
+  
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_cv_metrics_session_id ON cv_metrics(session_id);
+  `)
+
+  // Create cv_metrics_summary table (kept forever)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS cv_metrics_summary (
+      session_id TEXT PRIMARY KEY,
+      avg_attention_score REAL NOT NULL,
+      min_attention_score REAL NOT NULL,
+      face_present_pct REAL NOT NULL,
+      created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
+    );
+  `)
+
+  // Create app_settings table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key TEXT PRIMARY KEY,
+      setting_value TEXT NOT NULL
+    );
+  `)
+
   // Seed blocked_domains if empty
   const domainCount = db.prepare('SELECT COUNT(*) as count FROM blocked_domains').get() as { count: number }
   if (domainCount.count === 0) {

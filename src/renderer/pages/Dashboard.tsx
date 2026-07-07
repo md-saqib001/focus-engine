@@ -6,6 +6,8 @@ import DistractionAlert from '../components/DistractionAlert'
 import ErrorBoundary from '../components/ErrorBoundary'
 import { Play, Pause, Square, RotateCcw, X, ShieldAlert, CheckCircle, AlertCircle } from 'lucide-react'
 import { SessionType } from '../types/timer'
+import CVPermissionPrompt from '../components/CVPermissionPrompt'
+import CVAttentionPanel from '../components/CVAttentionPanel'
 
 const DashboardContent: React.FC = () => {
   const {
@@ -42,6 +44,28 @@ const DashboardContent: React.FC = () => {
   // Visual flash state when session completes
   const [flash, setFlash] = useState(false)
   const [dismissWarning, setDismissWarning] = useState(false)
+
+  // CV permission and enabled states
+  const [cvPermission, setCvPermission] = useState<'granted' | 'denied' | 'pending'>('pending')
+  const [cvEnabled, setCvEnabled] = useState(false)
+
+  useEffect(() => {
+    const fetchCVSettings = async () => {
+      try {
+        const permRes = await window.focusEngineAPI.getCVPermission()
+        if (permRes.success && permRes.data) {
+          setCvPermission(permRes.data)
+        }
+        const enabledRes = await window.focusEngineAPI.getCVEnabled()
+        if (enabledRes.success && enabledRes.data !== undefined) {
+          setCvEnabled(enabledRes.data)
+        }
+      } catch (err) {
+        console.error('[Dashboard] Error fetching CV settings:', err)
+      }
+    }
+    fetchCVSettings()
+  }, [timerState])
 
   useEffect(() => {
     if (timerState === 'completed') {
@@ -332,7 +356,24 @@ const DashboardContent: React.FC = () => {
           sessionId={sessionId}
           isActive={timerState === 'running' || timerState === 'paused'}
         />
+
+        {/* Live attention tracking panel */}
+        {cvEnabled && (
+          <CVAttentionPanel
+            isActive={timerState === 'running' || timerState === 'paused'}
+          />
+        )}
       </div>
+
+      {/* First-run permission modal */}
+      {cvPermission === 'pending' && (
+        <CVPermissionPrompt
+          onPermissionResolved={(status) => {
+            setCvPermission(status)
+            setCvEnabled(status === 'granted')
+          }}
+        />
+      )}
 
       {/* Session Summary Modal */}
       {summary && (

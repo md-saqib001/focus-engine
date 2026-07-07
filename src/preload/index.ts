@@ -107,6 +107,43 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('appBlocking:toggleApp', { appName, enabled })
   },
 
+  // CV Engine endpoints
+  startCV: (sessionId: string, fps?: number) => {
+    return ipcRenderer.invoke('cv:start', sessionId, fps)
+  },
+
+  stopCV: () => {
+    return ipcRenderer.invoke('cv:stop')
+  },
+
+  getCVSummary: (sessionId: string) => {
+    return ipcRenderer.invoke('cv:getSummary', sessionId)
+  },
+
+  getCVEnabled: () => {
+    return ipcRenderer.invoke('settings:getCVEnabled')
+  },
+
+  setCVEnabled: (enabled: boolean) => {
+    return ipcRenderer.invoke('settings:setCVEnabled', enabled)
+  },
+
+  getCVPermission: () => {
+    return ipcRenderer.invoke('settings:getCVPermission')
+  },
+
+  setCVPermission: (permission: 'granted' | 'denied' | 'pending') => {
+    return ipcRenderer.invoke('settings:setCVPermission', permission)
+  },
+
+  getCalibration: () => {
+    return ipcRenderer.invoke('settings:getCalibration')
+  },
+
+  setCalibration: (calibration: any) => {
+    return ipcRenderer.invoke('settings:setCalibration', calibration)
+  },
+
   // Telemetry endpoints
   startTelemetry: (sessionId: string) => {
     return ipcRenderer.invoke('telemetry:start', { sessionId })
@@ -225,6 +262,22 @@ const focusEngineAPI = {
     ipcRenderer.on('telemetry:healthWarning', subscription)
     return () => {
       ipcRenderer.removeListener('telemetry:healthWarning', subscription)
+    }
+  },
+
+  onCVUpdate: (callback: (data: any) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('cv:update', subscription)
+    return () => {
+      ipcRenderer.removeListener('cv:update', subscription)
+    }
+  },
+
+  onCVError: (callback: (error: string) => void) => {
+    const subscription = (_event: any, error: string) => callback(error)
+    ipcRenderer.on('cv:error', subscription)
+    return () => {
+      ipcRenderer.removeListener('cv:error', subscription)
     }
   }
 }

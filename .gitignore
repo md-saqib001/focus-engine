@@ -24,3 +24,10 @@ Thumbs.db
 
 # Electron build artifacts
 release/
+
+# Python CV environment and cache
+python/cv_env/
+python/**/__pycache__/
+python/**/*.pyc
+python/**/*.pyo
+python/**/*.task
