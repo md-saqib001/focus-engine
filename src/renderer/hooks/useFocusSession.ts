@@ -33,6 +33,7 @@ export const useFocusSession = () => {
     status: 'Active',
     idleSeconds: 0
   })
+  const [healthStatus, setHealthStatus] = useState<{ window: boolean; kpm: boolean; mouse: boolean } | null>(null)
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')
@@ -78,6 +79,26 @@ export const useFocusSession = () => {
       unsubscribeActivity()
     }
   }, [])
+
+  // Subscribe to real-time health checker warnings
+  useEffect(() => {
+    if (timer.state === 'running' || timer.state === 'paused') {
+      const unsub = window.focusEngineAPI.onTelemetryHealthWarning((status) => {
+        if (!status.window || !status.kpm || !status.mouse) {
+          setHealthStatus(status)
+        } else {
+          setHealthStatus(null)
+        }
+      })
+      return () => {
+        unsub()
+        setHealthStatus(null)
+      }
+    } else {
+      setHealthStatus(null)
+      return undefined
+    }
+  }, [timer.state])
 
   const {
     getElapsedSeconds,
@@ -357,6 +378,7 @@ export const useFocusSession = () => {
     activeWindow,
     kpm,
     activity,
+    healthStatus,
     startPomodoroSession,
     startStandardSession,
     pauseSession,

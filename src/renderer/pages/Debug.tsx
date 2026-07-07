@@ -21,7 +21,9 @@ const Debug: React.FC = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string>('')
   const [loadingSessions, setLoadingSessions] = useState(false)
   const [validating, setValidating] = useState(false)
+  const [bulkLoading, setBulkLoading] = useState(false)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [bulkResult, setBulkResult] = useState<any | null>(null)
   const [validationErr, setValidationErr] = useState<string | null>(null)
 
   // Fetch recent sessions on mount for easy selection dropdown
@@ -46,11 +48,31 @@ const Debug: React.FC = () => {
     loadSessions()
   }, [])
 
+  const handleValidateAll = async () => {
+    setBulkLoading(true)
+    setBulkResult(null)
+    setValidationResult(null)
+    setValidationErr(null)
+    try {
+      const res = await window.focusEngineAPI.validateAllSessions()
+      if (res.success && res.data) {
+        setBulkResult(res.data)
+      } else {
+        setValidationErr(res.error || 'Failed to validate all sessions.')
+      }
+    } catch (err: any) {
+      setValidationErr(err.message || String(err))
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   const handleValidate = async () => {
     if (!selectedSessionId.trim()) return
 
     setValidating(true)
     setValidationResult(null)
+    setBulkResult(null)
     setValidationErr(null)
 
     try {
@@ -121,7 +143,7 @@ const Debug: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '12px' }}>
-            <Button variant="primary" onClick={handleValidate} disabled={validating || !selectedSessionId}>
+            <Button variant="primary" onClick={handleValidate} disabled={validating || bulkLoading || !selectedSessionId}>
               {validating ? (
                 <>
                   <RefreshCw size={16} className="spin" style={{ marginRight: '8px' }} />
@@ -129,6 +151,16 @@ const Debug: React.FC = () => {
                 </>
               ) : (
                 'Validate Session Telemetry'
+              )}
+            </Button>
+            <Button variant="secondary" onClick={handleValidateAll} disabled={validating || bulkLoading}>
+              {bulkLoading ? (
+                <>
+                  <RefreshCw size={16} className="spin" style={{ marginRight: '8px' }} />
+                  Bulk Auditing...
+                </>
+              ) : (
+                'Validate All Sessions'
               )}
             </Button>
             <Button variant="ghost" onClick={loadSessions} disabled={loadingSessions}>
@@ -230,6 +262,92 @@ const Debug: React.FC = () => {
                 No database inconsistencies or collection gaps detected. This telemetry log is perfect!
               </div>
             )}
+          </div>
+        </Card>
+      )}
+
+      {bulkResult && (
+        <Card title="Bulk Telemetry Audit Findings">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            {/* Bulk summary figures */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+              <div style={{ backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Audited Sessions</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: '#f8fafc' }}>{bulkResult.totalSessionsAudited}</div>
+              </div>
+              <div style={{ backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Invalid Sessions</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: bulkResult.invalidSessions > 0 ? '#ef4444' : '#10b981' }}>{bulkResult.invalidSessions}</div>
+              </div>
+              <div style={{ backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total Errors</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: bulkResult.totalErrors > 0 ? '#ef4444' : '#f8fafc' }}>{bulkResult.totalErrors}</div>
+              </div>
+              <div style={{ backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Total Warnings</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: bulkResult.totalWarnings > 0 ? '#f59e0b' : '#f8fafc' }}>{bulkResult.totalWarnings}</div>
+              </div>
+              <div style={{ backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', padding: '10px 12px' }}>
+                <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Orphaned Sessions</div>
+                <div style={{ fontSize: '18px', fontWeight: 700, color: bulkResult.orphanedSessionsCount > 0 ? '#ef4444' : '#f8fafc' }}>{bulkResult.orphanedSessionsCount}</div>
+              </div>
+            </div>
+
+            {/* List of sessions with anomalies */}
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px' }}>
+                Audited Sessions Logs
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '350px', overflowY: 'auto', paddingRight: '4px' }}>
+                {bulkResult.results.map((res: any, idx: number) => (
+                  <div
+                    key={idx}
+                    style={{
+                      border: `1px solid ${res.isValid ? '#1e1e2f' : 'rgba(239, 68, 68, 0.4)'}`,
+                      borderRadius: '8px',
+                      padding: '12px',
+                      backgroundColor: res.isValid ? '#0c0c14' : 'rgba(239, 68, 68, 0.03)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px'
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{res.dateLabel}</strong>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          backgroundColor: res.isValid && res.warnings.length === 0 ? 'rgba(16, 185, 129, 0.15)' : res.isValid ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                          color: res.isValid && res.warnings.length === 0 ? '#10b981' : res.isValid ? '#f59e0b' : '#ef4444'
+                        }}
+                      >
+                        {res.isValid && res.warnings.length === 0 ? 'CLEAN' : res.isValid ? 'WARNINGS' : 'FAILED'}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#64748b', wordBreak: 'break-all' }}>
+                      UUID: {res.sessionId}
+                    </div>
+                    {(res.errors.length > 0 || res.warnings.length > 0) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', borderTop: '1px dashed #1e1e2f', paddingTop: '6px', marginTop: '4px' }}>
+                        {res.errors.map((err: string, i: number) => (
+                          <div key={i} style={{ fontSize: '11px', color: '#ef4444', display: 'flex', gap: '6px' }}>
+                            <span>❌</span> <span>{err}</span>
+                          </div>
+                        ))}
+                        {res.warnings.map((warn: string, i: number) => (
+                          <div key={i} style={{ fontSize: '11px', color: '#f59e0b', display: 'flex', gap: '6px' }}>
+                            <span>⚠️</span> <span>{warn}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </Card>
       )}

@@ -24,6 +24,12 @@ export class TelemetryPoller {
     timestamp: number
   }[] = []
 
+  private lastTickTime = 0
+
+  public getLastTickTime(): number {
+    return this.lastTickTime
+  }
+
   private readonly BATCH_SIZE = 12
 
   private listeners: ((info: BroadcastActiveWindowInfo) => void)[] = []
@@ -46,9 +52,11 @@ export class TelemetryPoller {
     this.stop() // Safely clear any previous poller first
     this.currentSessionId = sessionId
     this.buffer = [] // Reset buffer on new session start
+    this.lastTickTime = Date.now()
 
     const poll = async () => {
       if (!this.currentSessionId) return
+      this.lastTickTime = Date.now()
 
       try {
         const activeWindow = await getActiveWindow()

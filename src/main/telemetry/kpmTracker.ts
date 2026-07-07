@@ -6,6 +6,11 @@ export class KpmTracker {
   private intervalId: NodeJS.Timeout | null = null
   private currentSessionId: string | null = null
   private segmentStartTime = 0
+  private lastTickTime = 0
+
+  public getLastTickTime(): number {
+    return this.lastTickTime
+  }
 
   /**
    * Starts global keyboard metrics tracking for the session.
@@ -14,6 +19,7 @@ export class KpmTracker {
     this.stop() // Clear previous tracker instance if active
     this.currentSessionId = sessionId
     this.segmentStartTime = Date.now()
+    this.lastTickTime = Date.now()
 
     // Start the global keystroke counter hook
     keystrokeCounter.start()
@@ -54,6 +60,7 @@ export class KpmTracker {
     if (!this.currentSessionId) return
 
     const now = Date.now()
+    this.lastTickTime = now
     const elapsedMs = now - this.segmentStartTime
     const elapsedSeconds = elapsedMs / 1000
 

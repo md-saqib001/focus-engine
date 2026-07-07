@@ -19,6 +19,7 @@ const DashboardContent: React.FC = () => {
     progress,
     blockingError,
     summary,
+    healthStatus,
     startPomodoroSession,
     startStandardSession,
     pauseSession,
@@ -99,6 +100,42 @@ const DashboardContent: React.FC = () => {
       }}
     >
       <DistractionAlert />
+
+      {/* Telemetry Health Warning Banner */}
+      {healthStatus && (
+        <div
+          style={{
+            backgroundColor: 'rgba(239, 68, 68, 0.12)',
+            border: '1.5px solid #ef4444',
+            borderRadius: '12px',
+            padding: '16px 20px',
+            color: '#fca5a5',
+            fontSize: '13px',
+            lineHeight: '1.6',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px',
+            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+          }}
+        >
+          <ShieldAlert size={20} style={{ flexShrink: 0, marginTop: '2px', color: '#ef4444' }} />
+          <div>
+            <strong style={{ color: '#ef4444', fontSize: '14px' }}>⚠️ Critical Telemetry Failure:</strong>
+            <div style={{ marginTop: '4px' }}>
+              One or more system activity listeners have stopped responding:
+              <ul style={{ margin: '4px 0 0 16px', padding: 0, listStyleType: 'disc' }}>
+                {!healthStatus.window && <li>Active Window Poller appears dead</li>}
+                {!healthStatus.kpm && <li>Keystroke Rate Tracker appears dead</li>}
+                {!healthStatus.mouse && <li>Mouse Event Tracker appears dead</li>}
+              </ul>
+            </div>
+            <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px' }}>
+              This usually happens if background permissions are revoked, or the OS terminates secondary subprocesses.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 style={{ fontSize: '28px', fontWeight: 700, color: '#f8fafc', margin: '0 0 4px 0' }}>Dashboard</h1>
         <p style={{ color: '#64748b', margin: 0, fontSize: '14px' }}>Manage and monitor your active session.</p>

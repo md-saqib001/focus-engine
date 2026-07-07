@@ -105,13 +105,13 @@ export class DistractionDetector {
     }
     this.lastAppName = info.appName
 
-    // Keep switches only from the last 2 minutes (120,000 ms)
-    this.appSwitches = this.appSwitches.filter((t) => t >= now - 120000)
+    // Keep switches only from the last 30 seconds (30,000 ms)
+    this.appSwitches = this.appSwitches.filter((t) => t >= now - 30000)
 
-    if (this.appSwitches.length >= 8 && now - this.lastSwitchCooldown > 120000) {
+    if (this.appSwitches.length >= 8 && now - this.lastSwitchCooldown > 30000) {
       this.triggerEvent('excessive_switching', {
         switchCount: this.appSwitches.length,
-        timeframeSeconds: 120
+        timeframeSeconds: 30
       })
       this.lastSwitchCooldown = now
       // Reset switches to prevent immediate re-trigger

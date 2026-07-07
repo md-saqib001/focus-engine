@@ -156,6 +156,10 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:validateSession', { sessionId })
   },
 
+  validateAllSessions: () => {
+    return ipcRenderer.invoke('telemetry:validateAllSessions')
+  },
+
   getLatestWindow: () => {
     return ipcRenderer.invoke('telemetry:getLatestWindow')
   },
@@ -213,6 +217,14 @@ const focusEngineAPI = {
     ipcRenderer.on('telemetry:distractionEvent', subscription)
     return () => {
       ipcRenderer.removeListener('telemetry:distractionEvent', subscription)
+    }
+  },
+
+  onTelemetryHealthWarning: (callback: (status: { window: boolean; kpm: boolean; mouse: boolean }) => void) => {
+    const subscription = (_event: any, data: { window: boolean; kpm: boolean; mouse: boolean }) => callback(data)
+    ipcRenderer.on('telemetry:healthWarning', subscription)
+    return () => {
+      ipcRenderer.removeListener('telemetry:healthWarning', subscription)
     }
   }
 }

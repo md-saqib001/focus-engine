@@ -114,7 +114,7 @@ const History: React.FC = () => {
         case 'sustained_distraction':
           return `Spent 60+ seconds continuously on distraction category (${data.appName || 'unknown'} - ${data.domain || 'unknown'})`
         case 'excessive_switching':
-          return `Excessive multitasking: switched applications ${data.switchCount} times within 2 minutes`
+          return `Excessive multitasking: switched applications ${data.switchCount} times within 30 seconds`
         case 'blacklist_visit':
           return `Visited blacklisted domain "${data.domain}" in ${data.appName}`
         case 'extended_idle':

@@ -13,15 +13,16 @@ import {
   getMaxIdleDuration
 } from '../database/mouseMetricsRepository'
 import { getSessionTelemetrySummary } from '../database/telemetryAggregator'
-import { validateSession } from '../telemetry/validateTelemetry'
+import { validateSession, validateAllSessions } from '../telemetry/validateTelemetry'
 import { getActiveWindow } from '../telemetry/activeWindowTracker'
 import { classifyWindow } from '../telemetry/domainClassifier'
 import { mouseTracker } from '../telemetry/mouseTracker'
 import { distractionDetector } from '../telemetry/distractionDetector'
 import { getForSession as getDistractionEvents } from '../database/distractionEventsRepository'
+import { telemetryHealthCheck } from '../telemetry/telemetryHealthCheck'
 
 export function registerTelemetryHandlers(): void {
-  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking + distraction detector
+  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking + distraction detector + health checker
   ipcMain.handle(
     'telemetry:start',
     async (_event, args: { sessionId: string }) => {
@@ -30,6 +31,7 @@ export function registerTelemetryHandlers(): void {
         kpmTracker.start(args.sessionId)
         mouseMetricsTracker.start(args.sessionId)
         distractionDetector.start(args.sessionId)
+        telemetryHealthCheck.start(args.sessionId)
         return { success: true }
       } catch (error: any) {
         console.error('[IPC telemetry:start]', error)
@@ -38,13 +40,14 @@ export function registerTelemetryHandlers(): void {
     }
   )
 
-  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking + distraction detector
+  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking + distraction detector + health checker
   ipcMain.handle('telemetry:stop', async () => {
     try {
       telemetryPoller.stop()
       kpmTracker.stop()
       mouseMetricsTracker.stop()
       distractionDetector.stop()
+      telemetryHealthCheck.stop()
       return { success: true }
     } catch (error: any) {
       console.error('[IPC telemetry:stop]', error)
@@ -252,6 +255,20 @@ export function registerTelemetryHandlers(): void {
         return { success: true, data: events }
       } catch (error: any) {
         console.error('[IPC telemetry:getDistractionEvents]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:validateAllSessions — executes full integrity audits for all database sessions in bulk
+  ipcMain.handle(
+    'telemetry:validateAllSessions',
+    async () => {
+      try {
+        const summary = validateAllSessions()
+        return { success: true, data: summary }
+      } catch (error: any) {
+        console.error('[IPC telemetry:validateAllSessions]', error)
         return { success: false, error: error.message || String(error) }
       }
     }

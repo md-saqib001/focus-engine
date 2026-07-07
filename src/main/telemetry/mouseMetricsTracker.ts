@@ -8,6 +8,11 @@ export class MouseMetricsTracker {
   private liveIntervalId: NodeJS.Timeout | null = null
   private currentSessionId: string | null = null
   private segmentStartTime = 0
+  private lastTickTime = 0
+
+  public getLastTickTime(): number {
+    return this.lastTickTime
+  }
 
   /**
    * Starts tracking mouse activity metrics and live idle states.
@@ -16,6 +21,7 @@ export class MouseMetricsTracker {
     this.stop() // Clear previous instances first
     this.currentSessionId = sessionId
     this.segmentStartTime = Date.now()
+    this.lastTickTime = Date.now()
 
     // Start background powershell listener
     mouseTracker.start()
@@ -63,6 +69,7 @@ export class MouseMetricsTracker {
     if (!this.currentSessionId) return
 
     const now = Date.now()
+    this.lastTickTime = now
     const elapsedMs = now - this.segmentStartTime
     const elapsedSeconds = elapsedMs / 1000
 

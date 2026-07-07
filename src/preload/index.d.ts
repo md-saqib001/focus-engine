@@ -98,6 +98,20 @@ interface FocusEngineAPI {
     errors: string[]
     warnings: string[]
   }>>
+  validateAllSessions: () => Promise<IPCResult<{
+    totalSessionsAudited: number
+    invalidSessions: number
+    totalErrors: number
+    totalWarnings: number
+    orphanedSessionsCount: number
+    results: {
+      sessionId: string
+      dateLabel: string
+      isValid: boolean
+      errors: string[]
+      warnings: string[]
+    }[]
+  }>>
   getLatestWindow: () => Promise<IPCResult<{
     appName: string
     windowTitle: string
@@ -129,6 +143,13 @@ interface FocusEngineAPI {
       eventType: string
       eventData: any
       timestamp: number
+    }) => void
+  ) => () => void
+  onTelemetryHealthWarning: (
+    callback: (status: {
+      window: boolean
+      kpm: boolean
+      mouse: boolean
     }) => void
   ) => () => void
 }
