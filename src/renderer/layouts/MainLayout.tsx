@@ -1,13 +1,14 @@
 import React from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, History as HistoryIcon, Settings as SettingsIcon, BarChart3 } from 'lucide-react'
+import { LayoutDashboard, History as HistoryIcon, Settings as SettingsIcon, BarChart3, ShieldCheck } from 'lucide-react'
 
 const MainLayout: React.FC = () => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'History', path: '/history', icon: HistoryIcon },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
-    { name: 'Settings', path: '/settings', icon: SettingsIcon }
+    { name: 'Settings', path: '/settings', icon: SettingsIcon },
+    { name: 'Debug', path: '/debug', icon: ShieldCheck }
   ]
 
   return (

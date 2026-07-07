@@ -12,6 +12,8 @@ import {
   getForSession as getMouseHistory,
   getMaxIdleDuration
 } from '../database/mouseMetricsRepository'
+import { getSessionTelemetrySummary } from '../database/telemetryAggregator'
+import { validateSession } from '../telemetry/validateTelemetry'
 
 export function registerTelemetryHandlers(): void {
   // telemetry:start — starts window tracking + KPM tracking + Mouse tracking
@@ -161,6 +163,34 @@ export function registerTelemetryHandlers(): void {
         }
       } catch (error: any) {
         console.error('[IPC telemetry:getMouseHistory]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:getSessionSummary — aggregates metrics from window focus, keyboard, and mouse metrics
+  ipcMain.handle(
+    'telemetry:getSessionSummary',
+    async (_event, args: { sessionId: string }) => {
+      try {
+        const summary = getSessionTelemetrySummary(args.sessionId)
+        return { success: true, data: summary }
+      } catch (error: any) {
+        console.error('[IPC telemetry:getSessionSummary]', error)
+        return { success: false, error: error.message || String(error) }
+      }
+    }
+  )
+
+  // telemetry:validateSession — runs database checks to verify telemetry completeness
+  ipcMain.handle(
+    'telemetry:validateSession',
+    async (_event, args: { sessionId: string }) => {
+      try {
+        const result = validateSession(args.sessionId)
+        return { success: true, data: result }
+      } catch (error: any) {
+        console.error('[IPC telemetry:validateSession]', error)
         return { success: false, error: error.message || String(error) }
       }
     }

@@ -29,6 +29,7 @@ const History: React.FC = () => {
   // Row expansion and details states
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null)
   const [breakdown, setBreakdown] = useState<{ [category: string]: number }>({})
+  const [summary, setSummary] = useState<any | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
 
   const fetchSessions = async (): Promise<void> => {
@@ -52,24 +53,34 @@ const History: React.FC = () => {
   const handleRowClick = async (sessionId: string) => {
     if (expandedSessionId === sessionId) {
       setExpandedSessionId(null)
+      setSummary(null)
+      setBreakdown({})
       return
     }
 
     setExpandedSessionId(sessionId)
     setDetailLoading(true)
     setBreakdown({})
+    setSummary(null)
 
     try {
-      const res = await window.focusEngineAPI.getCategoryBreakdown(sessionId)
+      const res = await window.focusEngineAPI.getSessionSummary(sessionId)
       if (res.success && res.data) {
-        const itemMap: { [category: string]: number } = {}
-        res.data.forEach((item: CategoryBreakdownItem) => {
-          itemMap[item.category] = item.focus_count
-        })
-        setBreakdown(itemMap)
+        setSummary(res.data)
+        setBreakdown(res.data.categoryBreakdown || {})
+      } else {
+        // Fallback to basic breakdown if aggregator fails
+        const legacyRes = await window.focusEngineAPI.getCategoryBreakdown(sessionId)
+        if (legacyRes.success && legacyRes.data) {
+          const itemMap: { [category: string]: number } = {}
+          legacyRes.data.forEach((item: CategoryBreakdownItem) => {
+            itemMap[item.category] = item.focus_count
+          })
+          setBreakdown(itemMap)
+        }
       }
     } catch (err) {
-      console.error('[History] Failed to fetch category breakdown:', err)
+      console.error('[History] Failed to fetch session summary details:', err)
     } finally {
       setDetailLoading(false)
     }
@@ -351,7 +362,7 @@ const History: React.FC = () => {
                                       </div>
 
                                       {/* Legends with computed times */}
-                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '12px' }}>
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '12px', marginBottom: '24px' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                           <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
                                           <span style={{ color: '#94a3b8' }}>Productive:</span>
@@ -380,6 +391,62 @@ const History: React.FC = () => {
                                           <span style={{ color: '#64748b' }}>({unknPct.toFixed(0)}%)</span>
                                         </div>
                                       </div>
+
+                                      {/* Consolidated Metrics Panel */}
+                                      {summary && (
+                                        <div style={{ borderTop: '1px dashed #1e1e2f', paddingTop: '20px' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                              Session Diagnostics Summary
+                                            </span>
+                                          </div>
+                                          <div
+                                            style={{
+                                              display: 'grid',
+                                              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                                              gap: '12px'
+                                            }}
+                                          >
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Keystroke Rate</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                                                {summary.avgKpm} <span style={{ fontSize: '11px', fontWeight: 400, color: '#94a3b8' }}>avg KPM</span>
+                                              </div>
+                                              <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>Max: {summary.maxKpm} KPM</div>
+                                            </div>
+
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Mouse Clicks</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                                                {summary.totalClicks} <span style={{ fontSize: '11px', fontWeight: 400, color: '#94a3b8' }}>clicks</span>
+                                              </div>
+                                              <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>Movements: {summary.movementEvents}</div>
+                                            </div>
+
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Continuous Idle</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                                                {formatDuration(summary.maxIdleDuration)}
+                                              </div>
+                                              <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>Peak session gap</div>
+                                            </div>
+
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Most Used App</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={summary.mostUsedApp || 'None'}>
+                                                {summary.mostUsedApp || '—'}
+                                              </div>
+                                            </div>
+
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Top Distractor</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={summary.mostDistractingDomain || 'None'}>
+                                                {summary.mostDistractingDomain || 'None'}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
                                   )
                                 })()}

@@ -92,6 +92,12 @@ interface FocusEngineAPI {
     history: any[]
     maxIdleSeconds: number
   }>>
+  getSessionSummary: (sessionId: string) => Promise<IPCResult<any>>
+  validateSession: (sessionId: string) => Promise<IPCResult<{
+    isValid: boolean
+    errors: string[]
+    warnings: string[]
+  }>>
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string

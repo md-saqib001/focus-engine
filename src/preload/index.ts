@@ -148,6 +148,14 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('telemetry:getMouseHistory', { sessionId })
   },
 
+  getSessionSummary: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:getSessionSummary', { sessionId })
+  },
+
+  validateSession: (sessionId: string) => {
+    return ipcRenderer.invoke('telemetry:validateSession', { sessionId })
+  },
+
   onActiveWindowUpdate: (
     callback: (info: {
       appName: string
