@@ -140,22 +140,30 @@ export const useFocusSession = () => {
 
       await window.focusEngineAPI.saveSession(saveArgs)
 
-      setSummary({
-        session_id: sessionIdRef.current,
-        session_mode: mode,
-        session_type: sessionType,
-        start_time: sessionStartTime,
-        end_time: endTime,
-        duration_planned_sec: totalDurationSeconds || null,
-        duration_actual_sec: actualDuration,
-        completed,
-        end_reason: endReason,
-        apps_killed_count: appsKilled.length,
-        apps_killed: appsKilled,
-        auto_paused_count: autoPausedCountRef.current
-      })
+      if (sessionType === 'focus') {
+        setSummary({
+          session_id: sessionIdRef.current,
+          session_mode: mode,
+          session_type: sessionType,
+          start_time: sessionStartTime,
+          end_time: endTime,
+          duration_planned_sec: totalDurationSeconds || null,
+          duration_actual_sec: actualDuration,
+          completed,
+          end_reason: endReason,
+          apps_killed_count: appsKilled.length,
+          apps_killed: appsKilled,
+          auto_paused_count: autoPausedCountRef.current
+        })
+      } else {
+        // If it was a break session, directly reset back to idle focus
+        timer.reset()
+      }
     } catch (err) {
       console.error('[useFocusSession] Failed to save session:', err)
+      if (sessionType !== 'focus') {
+        timer.reset()
+      }
     }
   }, [
     getElapsedSeconds,
@@ -164,7 +172,8 @@ export const useFocusSession = () => {
     sessionStartTime,
     totalDurationSeconds,
     appsKilled,
-    performBlockingCleanup
+    performBlockingCleanup,
+    timer
   ])
 
   // Listen to live telemetry updates from the main process
@@ -307,17 +316,21 @@ export const useFocusSession = () => {
     autoPausedCountRef.current = 0
     pauseCountRef.current = 0
 
-    // Start active window tracking telemetry and CV Engine
-    try {
-      await window.focusEngineAPI.startTelemetry(sessionIdRef.current, 'pomodoro')
-      const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
-      if (cvEnabledRes.success && cvEnabledRes.data) {
-        await window.focusEngineAPI.startCV(sessionIdRef.current)
-      } else {
-        console.log('[useFocusSession] Webcam attention tracking is disabled in settings. Skipping startCV.')
+    // Start active window tracking telemetry and CV Engine ONLY for focus sessions
+    if (type === 'focus') {
+      try {
+        await window.focusEngineAPI.startTelemetry(sessionIdRef.current, 'pomodoro')
+        const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
+        if (cvEnabledRes.success && cvEnabledRes.data) {
+          await window.focusEngineAPI.startCV(sessionIdRef.current)
+        } else {
+          console.log('[useFocusSession] Webcam attention tracking is disabled in settings. Skipping startCV.')
+        }
+      } catch (err) {
+        console.error('[useFocusSession] Failed to start telemetry/CV:', err)
       }
-    } catch (err) {
-      console.error('[useFocusSession] Failed to start telemetry/CV:', err)
+    } else {
+      console.log('[useFocusSession] Break session started. Telemetry, CV, and Buffer loops are disabled.')
     }
 
     timer.startPomodoro(type, durationMinutes)
@@ -407,8 +420,14 @@ export const useFocusSession = () => {
   }, [timer, finalizeSession])
 
   const clearSummary = useCallback(() => {
+    const prevSummary = summary
     setSummary(null)
-  }, [])
+
+    if (prevSummary && prevSummary.completed && prevSummary.session_mode === 'pomodoro' && prevSummary.session_type === 'focus') {
+      // Automatically transition and start a 5-minute short break session
+      startPomodoroSession('shortBreak', 5)
+    }
+  }, [summary, startPomodoroSession])
 
   const setMode = useCallback((newMode: SessionMode) => {
     timer.setMode(newMode)

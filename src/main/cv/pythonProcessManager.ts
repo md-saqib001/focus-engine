@@ -4,6 +4,7 @@ import { app, BrowserWindow } from 'electron'
 import * as fs from 'fs'
 import { cvMetricsRepository } from '../database/cvMetricsRepository'
 import { settingsRepository } from '../database/settingsRepository'
+import { getProcessSpawnConfig } from '../utils/paths'
 
 class PythonCVProcessManager {
   private process: ChildProcess | null = null
@@ -26,13 +27,8 @@ class PythonCVProcessManager {
     this.stdoutBuffer = ''
     this.lastRecord = null
 
-    // Determine path to the virtual environment's python executable
-    const isWindows = process.platform === 'win32'
-    const pythonExe = isWindows 
-      ? join(app.getAppPath(), 'python', 'cv_env', 'Scripts', 'python.exe')
-      : join(app.getAppPath(), 'python', 'cv_env', 'bin', 'python')
-
-    const scriptPath = join(app.getAppPath(), 'python', 'cv_engine', 'main_loop.py')
+    // Determine spawn configuration
+    const spawnConfig = getProcessSpawnConfig('cv', 'main_loop.py')
 
     // Read calibration and write to temporary file if exists
     let calibrationFile: string | null = null
@@ -50,12 +46,12 @@ class PythonCVProcessManager {
 
     console.log(`[PythonCV] Spawning python CV engine... FPS=${fps}`)
     
-    const args = [scriptPath, '--fps', fps.toString(), '--stream-preview']
+    const args = [...spawnConfig.args, '--fps', fps.toString(), '--stream-preview']
     if (calibrationFile) {
       args.push('--calibration-file', calibrationFile)
     }
 
-    this.process = spawn(pythonExe, args)
+    this.process = spawn(spawnConfig.command, args)
 
     this.process.stdout?.on('data', (data: Buffer) => {
       this.handleStdoutData(data.toString('utf-8'))

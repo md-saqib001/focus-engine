@@ -1,6 +1,6 @@
 import { spawn } from 'child_process'
-import { join } from 'path'
-import { app, ipcMain } from 'electron'
+import { ipcMain } from 'electron'
+import { getProcessSpawnConfig } from '../utils/paths'
 import { getDatabase } from '../database/db'
 import { settingsRepository } from '../database/settingsRepository'
 
@@ -17,17 +17,12 @@ export interface RetrainRecord {
 }
 
 /**
- * Spawns a Python script and resolves with its stdout when complete.
+ * Spawns a Python script or compiled binary and resolves with its stdout when complete.
  */
 function runPythonScript(scriptRelativePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const isWindows = process.platform === 'win32'
-    const pythonExe = isWindows
-      ? join(app.getAppPath(), 'python', 'cv_env', 'Scripts', 'python.exe')
-      : join(app.getAppPath(), 'python', 'cv_env', 'bin', 'python')
-
-    const scriptPath = join(app.getAppPath(), 'python', 'ml', scriptRelativePath)
-    const proc = spawn(pythonExe, [scriptPath])
+    const spawnConfig = getProcessSpawnConfig('ml', scriptRelativePath)
+    const proc = spawn(spawnConfig.command, spawnConfig.args)
 
     let stdout = ''
     let stderr = ''

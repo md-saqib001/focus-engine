@@ -36,7 +36,8 @@ const DashboardContent: React.FC = () => {
     showForceEndModal,
     setShowForceEndModal,
     handleResumeFromAutoPause,
-    handleEndFromAutoPause
+    handleEndFromAutoPause,
+    sessionType
   } = useFocusSessionContext()
 
   // Selected session type for Pomodoro mode (defaults to focus)
@@ -147,7 +148,7 @@ const DashboardContent: React.FC = () => {
       <DistractionAlert />
 
       {/* Telemetry Health Warning Banner */}
-      {healthStatus && (
+      {healthStatus && sessionType === 'focus' && (
         <div
           style={{
             backgroundColor: 'rgba(239, 68, 68, 0.12)',
@@ -292,28 +293,33 @@ const DashboardContent: React.FC = () => {
             {/* Pomodoro Session Type Selector (Only visible in pomodoro mode when idle/completed) */}
             {mode === 'pomodoro' && (timerState === 'idle' || timerState === 'completed') && (
               <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                {(['focus', 'shortBreak', 'longBreak'] as SessionType[]).map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => {
-                      setSelectedType(type)
-                    }}
-                    style={{
-                      flex: 1,
-                      padding: '8px 4px',
-                      borderRadius: '8px',
-                      backgroundColor: selectedType === type ? '#232336' : 'transparent',
-                      color: selectedType === type ? '#ffffff' : '#64748b',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease',
-                      border: selectedType === type ? '1px solid #2e2e48' : '1px solid #1c1c2b'
-                    }}
-                  >
-                    {type === 'focus' ? 'Focus' : type === 'shortBreak' ? 'Short' : 'Long'}
-                  </button>
-                ))}
+                {(['focus', 'shortBreak', 'longBreak'] as SessionType[]).map((type) => {
+                  const isLocked = type !== 'focus'
+                  return (
+                    <button
+                      key={type}
+                      disabled={isLocked}
+                      onClick={() => {
+                        setSelectedType(type)
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px 4px',
+                        borderRadius: '8px',
+                        backgroundColor: selectedType === type ? '#232336' : 'transparent',
+                        color: selectedType === type ? '#ffffff' : '#64748b',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                        opacity: isLocked ? 0.4 : 1,
+                        transition: 'all 0.2s ease',
+                        border: selectedType === type ? '1px solid #2e2e48' : '1px solid #1c1c2b'
+                      }}
+                    >
+                      {type === 'focus' ? 'Focus' : type === 'shortBreak' ? 'Short' : 'Long'}
+                    </button>
+                  )
+                })}
               </div>
             )}
 
@@ -331,7 +337,7 @@ const DashboardContent: React.FC = () => {
               progress={progress}
             />
 
-            <LivePredictionBadge isActive={timerState === 'running' || timerState === 'paused'} />
+            <LivePredictionBadge isActive={(timerState === 'running' || timerState === 'paused') && sessionType === 'focus'} />
 
             {/* Controls */}
             <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>
@@ -375,24 +381,24 @@ const DashboardContent: React.FC = () => {
         {/* Live diagnostics panel shown during active focus sessions */}
         <LiveTelemetryPanel
           sessionId={sessionId}
-          isActive={timerState === 'running' || timerState === 'paused'}
+          isActive={(timerState === 'running' || timerState === 'paused') && sessionType === 'focus'}
         />
 
         {/* Live attention tracking panel */}
         {cvEnabled && (
           <CVAttentionPanel
-            isActive={timerState === 'running' || timerState === 'paused'}
+            isActive={(timerState === 'running' || timerState === 'paused') && sessionType === 'focus'}
           />
         )}
 
         {/* Focus Buffer Gauge Card */}
         <FocusBufferGauge
-          isActive={timerState === 'running' || timerState === 'paused'}
+          isActive={(timerState === 'running' || timerState === 'paused') && sessionType === 'focus'}
         />
 
         {/* Focus Signal Breakdown Card */}
         <BufferSignalBreakdown
-          isActive={timerState === 'running' || timerState === 'paused'}
+          isActive={(timerState === 'running' || timerState === 'paused') && sessionType === 'focus'}
         />
       </div>
 

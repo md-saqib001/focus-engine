@@ -1,7 +1,6 @@
 import * as fs from 'fs'
-import { join } from 'path'
-import { app } from 'electron'
 import { getDatabase } from '../database/db'
+import { getModelsPath } from '../utils/paths'
 
 /**
  * Generates a personalized focus recommendation based on the top feature importance of the trained ML model.
@@ -27,7 +26,7 @@ export function getPersonalizedRecommendation(): string {
 
   // 2. Load model feature importances saved during the last training cycle
   try {
-    const importancesPath = join(app.getAppPath(), 'python', 'ml', 'models', 'feature_importances.json')
+    const importancesPath = getModelsPath('feature_importances.json')
     if (!fs.existsSync(importancesPath)) {
       return "Unlock personalized recommendations by completing more focus sessions."
     }

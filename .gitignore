@@ -31,3 +31,11 @@ python/**/__pycache__/
 python/**/*.pyc
 python/**/*.pyo
 python/**/*.task
+
+# PyInstaller build directories and specs
+build/*/
+*.spec
+
+# Dynamic ML datasets and candidate models
+python/ml/data/dataset.csv
+python/ml/models/*_candidate*

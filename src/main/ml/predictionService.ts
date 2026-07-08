@@ -1,6 +1,5 @@
 import { spawn } from 'child_process'
-import { join } from 'path'
-import { app } from 'electron'
+import { getProcessSpawnConfig } from '../utils/paths'
 
 export interface PredictionResult {
   success: boolean
@@ -17,14 +16,9 @@ export const predictionService = {
   getPrediction(features: Record<string, number>): Promise<PredictionResult> {
     return new Promise((resolve) => {
       try {
-        const isWindows = process.platform === 'win32'
-        const pythonExe = isWindows
-          ? join(app.getAppPath(), 'python', 'cv_env', 'Scripts', 'python.exe')
-          : join(app.getAppPath(), 'python', 'cv_env', 'bin', 'python')
+        const spawnConfig = getProcessSpawnConfig('ml', 'predict.py')
 
-        const scriptPath = join(app.getAppPath(), 'python', 'ml', 'predict.py')
-
-        const processInstance = spawn(pythonExe, [scriptPath])
+        const processInstance = spawn(spawnConfig.command, spawnConfig.args)
 
         let stdoutData = ''
         let stderrData = ''
