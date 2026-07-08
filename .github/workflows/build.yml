@@ -13,9 +13,6 @@ asarUnpack:
   - resources/**
 win:
   executableName: focus-engine-temp
-  requestedExecutionLevel: requireAdministrator
-  signtoolOptions:
-    sign: ./build/customSign.js
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -45,17 +42,10 @@ publish:
   provider: generic
   url: https://example.com/auto-updates
 
+# --- ADDED CONFIGURATION ---
+# Tells electron-builder to copy the compiled PyInstaller 
+# executables into the final app's resources folder.
 extraResources:
-  - from: build/bin
-    to: bin
-    filter:
-      - "**/*"
-  - from: python/ml/models
-    to: bin/models
-    filter:
-      - "*.pkl"
-      - "*.json"
-  - from: python/cv_engine
-    to: bin
-    filter:
-      - "face_landmarker.task"
+  - from: "build/bin"
+    to: "bin"
+    filter: ["**/*"]

@@ -36,12 +36,21 @@ from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision as mp_vision
 
 
+import sys
+import tempfile
+
 # ---------------------------------------------------------------------------
 # Model path — sits next to this file, git-ignored via *.task
 # ---------------------------------------------------------------------------
-_MODEL_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "face_landmarker.task"
-)
+if getattr(sys, "frozen", False):
+    _MODEL_PATH = os.path.join(
+        os.path.dirname(sys.executable), "face_landmarker.task"
+    )
+else:
+    _MODEL_PATH = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "face_landmarker.task"
+    )
+
 _MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/"
     "face_landmarker/face_landmarker/float16/1/face_landmarker.task"
@@ -50,11 +59,24 @@ _MODEL_URL = (
 
 def _ensure_model(path: str = _MODEL_PATH) -> str:
     """Download the model file if not already cached. Returns path."""
-    if not os.path.exists(path):
-        print(f"[FaceDetector] Downloading face landmarker model (~6 MB)...", flush=True)
+    if os.path.exists(path):
+        return path
+
+    print(f"[FaceDetector] Downloading face landmarker model (~6 MB)...", flush=True)
+    try:
         urllib.request.urlretrieve(_MODEL_URL, path)
         print(f"[FaceDetector] Model cached at: {path}", flush=True)
-    return path
+        return path
+    except Exception as err:
+        # Fallback to writeable system temp folder if directory is read-only
+        temp_path = os.path.join(tempfile.gettempdir(), "face_landmarker.task")
+        if os.path.exists(temp_path):
+            print(f"[FaceDetector] Using cached model from temp: {temp_path}", flush=True)
+            return temp_path
+        print(f"[FaceDetector] Write failed for default path ({err}). Downloading to temp: {temp_path}", flush=True)
+        urllib.request.urlretrieve(_MODEL_URL, temp_path)
+        print(f"[FaceDetector] Model cached at temp: {temp_path}", flush=True)
+        return temp_path
 
 
 # ---------------------------------------------------------------------------
