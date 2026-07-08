@@ -14,6 +14,7 @@ import { bufferStateTransitionsRepository } from '../database/bufferStateTransit
 import { getEventsSince } from '../database/distractionEventsRepository'
 import { BufferStateMachine } from './bufferStateMachine'
 import { BrowserWindow } from 'electron'
+import { livePredictionPoller } from './livePredictionPoller'
 
 // How many consecutive seconds of inattention before CV starts decaying the buffer
 const CV_GRACE_PERIOD_SEC = 10
@@ -31,6 +32,7 @@ class BufferOrchestrator {
   private cvLookAwaySeconds: number = 0
   private sessionMode: 'pomodoro' | 'standard' = 'standard'
   private autoPausedCount: number = 0
+  private manualPausedCount: number = 0
   private standardForceEndTimeoutId: NodeJS.Timeout | null = null
 
   /**
@@ -42,6 +44,7 @@ class BufferOrchestrator {
     this.sessionId = sessionId
     this.sessionMode = mode
     this.autoPausedCount = 0
+    this.manualPausedCount = 0
     this.buffer = new FocusBuffer()
     this.secondsElapsed = 0
     this.cvLookAwaySeconds = 0
@@ -58,6 +61,8 @@ class BufferOrchestrator {
     }
 
     console.log(`[BufferOrchestrator] Starting focus buffer loop for session ${sessionId} in ${mode} mode...`)
+
+    livePredictionPoller.start(sessionId)
 
     this.intervalId = setInterval(() => {
       this.tick()
@@ -85,6 +90,8 @@ class BufferOrchestrator {
         console.error('[BufferOrchestrator] Failed to close active state transition on stop:', err)
       }
     }
+
+    livePredictionPoller.stop()
 
     this.buffer = null
     this.sessionId = null
@@ -324,6 +331,7 @@ class BufferOrchestrator {
   }
 
   public pause(): void {
+    this.manualPausedCount++
     if (this.intervalId) {
       clearInterval(this.intervalId)
       this.intervalId = null
@@ -356,6 +364,22 @@ class BufferOrchestrator {
 
   public getAutoPausedCount(): number {
     return this.autoPausedCount
+  }
+
+  public getPauseCount(): number {
+    return this.autoPausedCount + this.manualPausedCount
+  }
+
+  public getSessionId(): string | null {
+    return this.sessionId
+  }
+
+  public getSessionMode(): 'pomodoro' | 'standard' {
+    return this.sessionMode
+  }
+
+  public getSecondsElapsed(): number {
+    return this.secondsElapsed
   }
 
   public getHistory(): any[] {

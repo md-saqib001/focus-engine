@@ -11,6 +11,8 @@ type SaveSessionArgs =
       durationActualSec: number
       completed: boolean
       endReason: 'auto_complete' | 'abandoned'
+      autoPausedCount?: number
+      pauseCount?: number
     }
   | {
       sessionId: string
@@ -20,6 +22,8 @@ type SaveSessionArgs =
       durationActualSec: number
       completed: boolean
       endReason: 'manual_stop' | 'force_ended'
+      autoPausedCount?: number
+      pauseCount?: number
     }
 
 interface SessionRow {
@@ -251,6 +255,12 @@ interface FocusEngineAPI {
   getBufferStateTimeSummary: (sessionId: string) => Promise<IPCResult<{
     [state: string]: number
   }>>
+  onMLPrediction: (
+    callback: (data: {
+      focusScore: number
+      isAnomaly: boolean
+    }) => void
+  ) => () => void
   analytics: {
     getHeatmap: () => Promise<IPCResult<{
       dayOfWeek: number
@@ -294,6 +304,27 @@ interface FocusEngineAPI {
       } | null
       recommendations: string[]
     }>>
+    triggerRetrain: () => Promise<IPCResult<{
+      timestamp: number
+      real_sessions: number
+      synthetic_sessions: number
+      r2_score: number
+      mae_score: number
+      cv_r2_mean: number
+      cv_mae_mean: number
+      deployed: boolean
+    }>>
+    getRetrainHistory: () => Promise<IPCResult<{
+      id?: number
+      timestamp: number
+      real_sessions: number
+      synthetic_sessions: number
+      r2_score: number
+      mae_score: number
+      cv_r2_mean: number
+      cv_mae_mean: number
+      deployed: boolean
+    }[]>>
   }
 }
 

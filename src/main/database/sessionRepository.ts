@@ -12,6 +12,7 @@ export interface SessionRow {
   end_reason: string | null
   focus_score: number | null
   auto_paused_count: number
+  pause_count: number
   created_at: number
   apps_killed?: number
 }
@@ -36,6 +37,7 @@ export function saveSession(params: {
   completed: boolean
   endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
   autoPausedCount?: number
+  pauseCount?: number
 }): SessionRow {
   const {
     sessionId,
@@ -47,7 +49,8 @@ export function saveSession(params: {
     durationActualSec,
     completed,
     endReason,
-    autoPausedCount = 0
+    autoPausedCount = 0,
+    pauseCount = 0
   } = params
 
   // Validate mode contract
@@ -84,9 +87,9 @@ export function saveSession(params: {
     INSERT INTO sessions (
       session_id, session_mode, session_type, start_time, end_time,
       duration_planned_sec, duration_actual_sec, completed, end_reason, created_at,
-      auto_paused_count
+      auto_paused_count, pause_count
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   stmt.run(
@@ -100,7 +103,8 @@ export function saveSession(params: {
     completed ? 1 : 0,
     endReason,
     startTime,
-    autoPausedCount
+    autoPausedCount,
+    pauseCount
   )
 
   return {
@@ -115,6 +119,7 @@ export function saveSession(params: {
     end_reason: endReason,
     focus_score: null,
     auto_paused_count: autoPausedCount,
+    pause_count: pauseCount,
     created_at: startTime
   }
 }

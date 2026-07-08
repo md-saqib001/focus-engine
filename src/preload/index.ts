@@ -12,6 +12,8 @@ type SaveSessionArgs =
       durationActualSec: number
       completed: boolean
       endReason: 'auto_complete' | 'abandoned'
+      autoPausedCount?: number
+      pauseCount?: number
     }
   | {
       sessionId: string
@@ -21,6 +23,8 @@ type SaveSessionArgs =
       durationActualSec: number
       completed: boolean
       endReason: 'manual_stop' | 'force_ended'
+      autoPausedCount?: number
+      pauseCount?: number
     }
 
 // The API exposed to the renderer process via contextBridge
@@ -36,7 +40,9 @@ const focusEngineAPI = {
         durationPlannedSec: args.durationPlannedSec,
         durationActualSec: args.durationActualSec,
         completed: args.completed,
-        endReason: args.endReason
+        endReason: args.endReason,
+        autoPausedCount: args.autoPausedCount,
+        pauseCount: args.pauseCount
       })
     } else {
       return ipcRenderer.invoke('session:save', {
@@ -48,7 +54,9 @@ const focusEngineAPI = {
         durationPlannedSec: null,
         durationActualSec: args.durationActualSec,
         completed: args.completed,
-        endReason: args.endReason
+        endReason: args.endReason,
+        autoPausedCount: args.autoPausedCount,
+        pauseCount: args.pauseCount
       })
     }
   },
@@ -359,11 +367,21 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('buffer:getStateTimeSummary', { sessionId })
   },
 
+  onMLPrediction: (callback: (data: { focusScore: number; isAnomaly: boolean }) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('ml:prediction', subscription)
+    return () => {
+      ipcRenderer.removeListener('ml:prediction', subscription)
+    }
+  },
+
   analytics: {
     getHeatmap: () => ipcRenderer.invoke('analytics:getHeatmap'),
     getStreaks: () => ipcRenderer.invoke('analytics:getStreaks'),
     getProductivitySummary: () => ipcRenderer.invoke('analytics:getProductivitySummary'),
-    getRecommendations: () => ipcRenderer.invoke('analytics:getRecommendations')
+    getRecommendations: () => ipcRenderer.invoke('analytics:getRecommendations'),
+    triggerRetrain: () => ipcRenderer.invoke('ml:triggerRetrain'),
+    getRetrainHistory: () => ipcRenderer.invoke('ml:getRetrainHistory')
   }
 }
 

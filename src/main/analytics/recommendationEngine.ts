@@ -1,4 +1,5 @@
 import { getDatabase } from '../database/db'
+import { getPersonalizedRecommendation } from '../ml/personalizedRecommendations'
 
 export interface FocusWindow {
   startHour: number
@@ -120,7 +121,7 @@ export const recommendationEngine = {
       : null
 
     // 5. Generate natural-language recommendation sentences
-    const recommendations: string[] = []
+    const recommendations: string[] = [getPersonalizedRecommendation()]
 
     // Sentence 1: Focus Window advice
     if (bestWindow) {

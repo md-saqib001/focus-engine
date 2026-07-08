@@ -31,6 +31,7 @@ export function getDatabase(): Database.Database {
       end_reason TEXT,
       focus_score REAL,
       auto_paused_count INTEGER NOT NULL DEFAULT 0,
+      pause_count INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
     );
   `)
@@ -120,6 +121,20 @@ export function getDatabase(): Database.Database {
     }
   } catch (err) {
     console.error('[DB] Failed sessions table migration check:', err)
+  }
+
+  // Migrate sessions table to add pause_count column if missing
+  try {
+    const columns = db.pragma("table_info(sessions)") as { name: string }[]
+    if (columns.length > 0) {
+      const hasPauseCount = columns.some((c) => c.name === 'pause_count')
+      if (!hasPauseCount) {
+        console.log('[DB] Migrating sessions table: Adding pause_count column...')
+        db.exec('ALTER TABLE sessions ADD COLUMN pause_count INTEGER NOT NULL DEFAULT 0;')
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Failed sessions table migration check for pause_count:', err)
   }
 
   // Create index on session_id for quick history lookups
@@ -243,6 +258,21 @@ export function getDatabase(): Database.Database {
   
   db.exec(`
     CREATE INDEX IF NOT EXISTS idx_buffer_state_transitions_session_id ON buffer_state_transitions(session_id);
+  `)
+
+  // Create retrain_history table if it doesn't exist
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS retrain_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp INTEGER NOT NULL,
+      real_sessions INTEGER NOT NULL,
+      synthetic_sessions INTEGER NOT NULL,
+      r2_score REAL,
+      mae_score REAL,
+      cv_r2_mean REAL,
+      cv_mae_mean REAL,
+      deployed INTEGER NOT NULL
+    );
   `)
 
   // Seed blocked_domains if empty

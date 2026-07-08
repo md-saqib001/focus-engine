@@ -38,6 +38,7 @@ export const useFocusSession = () => {
   const [showAutoPauseModal, setShowAutoPauseModal] = useState(false)
   const [showForceEndModal, setShowForceEndModal] = useState(false)
   const autoPausedCountRef = useRef<number>(0)
+  const pauseCountRef = useRef<number>(0)
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')
@@ -121,7 +122,8 @@ export const useFocusSession = () => {
             durationActualSec: actualDuration,
             completed,
             endReason: endReason as 'auto_complete' | 'abandoned',
-            autoPausedCount: autoPausedCountRef.current
+            autoPausedCount: autoPausedCountRef.current,
+            pauseCount: pauseCountRef.current
           }
         : {
             sessionId: sessionIdRef.current,
@@ -132,7 +134,8 @@ export const useFocusSession = () => {
             durationActualSec: actualDuration,
             completed,
             endReason: endReason as 'manual_stop' | 'force_ended',
-            autoPausedCount: autoPausedCountRef.current
+            autoPausedCount: autoPausedCountRef.current,
+            pauseCount: pauseCountRef.current
           }
 
       await window.focusEngineAPI.saveSession(saveArgs)
@@ -176,6 +179,7 @@ export const useFocusSession = () => {
       setActivity(act)
     })
     const unsubscribeAutoPause = window.focusEngineAPI.onSessionAutoPause(() => {
+      pauseCountRef.current++
       timer.pause()
       setShowAutoPauseModal(true)
     })
@@ -301,6 +305,7 @@ export const useFocusSession = () => {
     }
 
     autoPausedCountRef.current = 0
+    pauseCountRef.current = 0
 
     // Start active window tracking telemetry and CV Engine
     try {
@@ -331,6 +336,7 @@ export const useFocusSession = () => {
     isBlockingSessionRef.current = true
 
     autoPausedCountRef.current = 0
+    pauseCountRef.current = 0
 
     try {
       const res = await window.focusEngineAPI.startBlocking()
@@ -370,6 +376,7 @@ export const useFocusSession = () => {
   }, [timer])
 
   const pauseSession = useCallback(async () => {
+    pauseCountRef.current++
     await window.focusEngineAPI.pauseBuffer()
     timer.pause()
   }, [timer])

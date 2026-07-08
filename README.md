@@ -1,6 +1,6 @@
 # Focus Engine
 
-A productivity-tracking desktop application built with Electron + React + TypeScript, with a computer vision layer powered by Python, OpenCV, and MediaPipe.
+A productivity-tracking desktop application built with Electron + React + TypeScript, with a computer vision layer powered by Python, OpenCV, and MediaPipe, and an offline machine learning prediction system powered by scikit-learn.
 
 ---
 
@@ -39,9 +39,11 @@ npm run build:linux
 
 ---
 
-## Python / Computer Vision Setup
+## Python / Machine Learning & CV Setup
 
-The CV engine lives in `python/cv_engine/`. It communicates with Node.js via **WebSocket** (continuous streaming) — there is **no HTTP server** anywhere in this stack.
+The CV and Machine Learning subsystems live in `python/cv_engine/` and `python/ml/` respectively. Both execute fully locally in your environment:
+- **WebSocket Connection**: The CV process communicates with Node.js via WebSocket (continuous streaming).
+- **Spawn-per-Call stdin/stdout**: The ML prediction engine (`predict.py`) is spawned on-demand, consuming JSON feature arrays on stdin, performing inference, writing JSON back to stdout, and exiting immediately to conserve memory.
 
 ### 1. Create and activate the virtual environment
 
@@ -65,27 +67,30 @@ source python/cv_env/bin/activate
 > **Tip (Windows):** If PowerShell blocks script execution, run once:
 > `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 
-### 2. Install dependencies
+### 2. Install dependencies (CV + ML)
 
 ```bash
 pip install -r python/cv_engine/requirements.txt
+pip install pandas scikit-learn seaborn
 ```
 
-### 3. Verify the webcam
+### 3. Verify the CV webcam and MediaPipe Face Mesh
 
 ```bash
 python python/cv_engine/webcam_test.py
-```
-
-A live preview window opens. Press **Q** to quit.
-
-### 4. Verify MediaPipe Face Mesh
-
-```bash
 python python/cv_engine/mediapipe_test.py
 ```
 
-You should see your face with the full 468-point mesh + iris landmarks drawn. The terminal prints `Face detected` / `No face` per frame.
+---
+
+## ML Pipeline: Observe → Label → Train → Predict → Improve
+
+To solve the "cold start" ML training problem, the application implements a statistical bootstrap strategy:
+1. **Calibration Pool**: Generates 200 synthetic sessions modeling High-Focus and Low-Focus behavioral archetypes backdated 60–90 days.
+2. **Sliding Training Window**: Re-builds a 40-row dataset of the most recent sessions by sorting both real database logs and the synthetic pool chronologically descending.
+3. **Automatic Phasing-Out**: As you complete real focus sessions, they accumulate at the top of the descending sort, naturally displacing the oldest synthetic rows from the 40-row sliding window with zero manual cutover required.
+4. **Weekly Retraining**: App launch triggers a background check. If 7+ days have elapsed since the last retrain, it re-slices the 40-row sliding window and re-trains `RandomForestRegressor` and `IsolationForest` models.
+5. **Deployment Gate**: The retraining pipeline compares the candidate model's 5-fold cross-validated $R^2$ against the currently active model, overwriting the production pickle file only if performance improves.
 
 ---
 
@@ -106,19 +111,25 @@ These constraints mean the CV subsystem satisfies a **"numeric output only"** da
 
 ---
 
-## Project Structure (abbreviated)
+## Project Structure
 
 ```
 focus-engine/
 ├── src/
-│   ├── main/          # Electron main process (TypeScript)
-│   ├── renderer/      # React UI (TypeScript)
-│   └── preload/       # Context bridge
+│   ├── main/                  # Electron main process (TypeScript)
+│   │   ├── ml/                # Prediction Service, Recommendations, and Weekly Retraining
+│   │   ├── database/          # SQLite repos (sessions, telemetry, transitions, settings)
+│   │   └── buffer/            # Live prediction poller and state machines
+│   ├── renderer/              # React UI (TypeScript)
+│   └── preload/               # Context bridge
 ├── python/
-│   ├── cv_env/        # Python venv (git-ignored)
-│   └── cv_engine/
-│       ├── requirements.txt
-│       ├── webcam_test.py      # TEST ONLY
-│       └── mediapipe_test.py   # TEST ONLY
-└── resources/
+│   ├── cv_env/                # Python venv (git-ignored)
+│   ├── cv_engine/             # Computer Vision capture and gaze estimation scripts
+│   └── ml/                    # Data cleanups, extractor, generators, trainers, and predictors
+│       ├── data/              # CSV datasets (synthetic pool, sliding window dataset.csv)
+│       ├── models/            # Pickle models (.pkl) and model metadata JSONs
+│       ├── eda_output/        # Focus score distribution plots and correlation matrices
+│       ├── constants.py       # Shared feature order alignment constant
+│       └── predict.py         # Stdin/stdout inference responder
+└── electron.vite.config.ts    # Build configuration
 ```

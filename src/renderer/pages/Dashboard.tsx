@@ -10,6 +10,7 @@ import CVPermissionPrompt from '../components/CVPermissionPrompt'
 import CVAttentionPanel from '../components/CVAttentionPanel'
 import FocusBufferGauge from '../components/FocusBufferGauge'
 import BufferSignalBreakdown from '../components/BufferSignalBreakdown'
+import LivePredictionBadge from '../components/LivePredictionBadge'
 
 const DashboardContent: React.FC = () => {
   const {
@@ -138,7 +139,7 @@ const DashboardContent: React.FC = () => {
         display: 'flex',
         flexDirection: 'column',
         gap: '24px',
-        maxWidth: '800px',
+        maxWidth: '1040px',
         margin: '0 auto',
         animation: flash ? 'flashEffect 0.5s ease-out 4' : 'none'
       }}
@@ -231,8 +232,8 @@ const DashboardContent: React.FC = () => {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'flex-start', gap: '24px', width: '100%', maxWidth: '960px', margin: '0 auto' }}>
-        <Card title={mode === 'pomodoro' ? 'Pomodoro Session' : 'Standard Focus Session'} style={{ width: '100%', maxWidth: '460px', flex: '1 1 360px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', width: '100%', maxWidth: '1000px', margin: '0 auto', justifyItems: 'center', alignItems: 'start' }}>
+        <Card title={mode === 'pomodoro' ? 'Pomodoro Session' : 'Standard Focus Session'} style={{ width: '100%', maxWidth: '460px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '24px', padding: '12px 0' }}>
             
             {/* Mode Selector (Only visible when idle or completed) */}
@@ -330,7 +331,7 @@ const DashboardContent: React.FC = () => {
               progress={progress}
             />
 
-
+            <LivePredictionBadge isActive={timerState === 'running' || timerState === 'paused'} />
 
             {/* Controls */}
             <div style={{ display: 'flex', gap: '12px', width: '100%', justifyContent: 'center' }}>

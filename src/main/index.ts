@@ -12,6 +12,7 @@ import { registerBufferHandlers } from './ipc/bufferHandlers'
 import { registerAnalyticsHandlers } from './ipc/analyticsHandlers'
 import { restoreHostsSync } from './blocking/hostsFileManager'
 import { settingsRepository } from './database/settingsRepository'
+import { registerMLHandlers, weeklyRetraining } from './ml/weeklyRetraining'
 
 function createWindow(): void {
   // Create the browser window.
@@ -69,6 +70,11 @@ app.whenReady().then(() => {
   // Seed default calibration values if this is first launch
   settingsRepository.seedDefaultsIfNeeded()
 
+  // Run weekly ML retraining check
+  weeklyRetraining.checkAndTriggerRetrain().catch((err) => {
+    console.error('[WeeklyRetraining] Startup check failed:', err)
+  })
+
   // Register all IPC handlers
   registerSessionHandlers()
   registerBlockingHandlers()
@@ -77,6 +83,7 @@ app.whenReady().then(() => {
   registerCVHandlers()
   registerBufferHandlers()
   registerAnalyticsHandlers()
+  registerMLHandlers()
 
   createWindow()
 
