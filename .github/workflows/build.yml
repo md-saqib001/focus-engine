@@ -4,16 +4,30 @@ on:
   push:
     tags:
       - 'v*'
-
-  workflow_dispatch:   # lets you manually trigger from the Actions tab to test
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
+    needs: create-release
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false        # <-- one OS failing no longer kills the others
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
 
@@ -24,7 +38,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'   # bumped from 20 — see note below
 
       - name: Setup Python
         uses: actions/setup-python@v5
