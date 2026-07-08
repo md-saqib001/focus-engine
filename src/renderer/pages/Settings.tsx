@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Button } from '@/components/ui'
-import { Trash2, Plus, Globe, ShieldAlert, Laptop, Camera, ShieldCheck, UserCheck } from 'lucide-react'
+import { Trash2, Plus, Globe, ShieldAlert, Laptop, Camera, ShieldCheck, UserCheck, RotateCcw } from 'lucide-react'
 import CVCalibrationHelper from '../components/CVCalibrationHelper'
 
 interface BlockedDomainRow {
@@ -25,10 +25,18 @@ const Settings: React.FC = () => {
   const [newApp, setNewApp] = useState('')
   const [loading, setLoading] = useState(true)
 
-  // CV Settings states
   const [cvEnabled, setCvEnabled] = useState(true)
   const [showCalibration, setShowCalibration] = useState(false)
   const [calibrationData, setCalibrationData] = useState<any>(null)
+
+  const handleResetCalibration = async () => {
+    try {
+      await window.focusEngineAPI.resetCalibrationToDefault()
+      await fetchCVSettings()
+    } catch (err) {
+      console.error('[Settings] Failed to reset calibration:', err)
+    }
+  }
 
   const fetchCVSettings = async (): Promise<void> => {
     try {
@@ -514,10 +522,37 @@ const Settings: React.FC = () => {
                   <div style={{ padding: '12px', backgroundColor: '#0f0f17', border: '1px solid #1e1e2f', borderRadius: '8px', fontSize: '12px', color: '#cbd5e1', lineHeight: '1.6' }}>
                     <div style={{ display: 'flex', gap: '16px', alignItems: 'center', marginBottom: '6px' }}>
                       <UserCheck size={16} style={{ color: '#10b981' }} />
-                      <strong>Baseline Calibration Found</strong>
+                      <strong>Baseline Calibration Found (v{calibrationData.version || 1})</strong>
                     </div>
-                    <div>• <strong>Active Screen</strong>: Yaw {calibrationData.screen.yaw}°, Pitch {calibrationData.screen.pitch}°</div>
-                    <div>• <strong>Distraction (Phone/Lap)</strong>: Yaw {calibrationData.distract.yaw}°, Pitch {calibrationData.distract.pitch}°</div>
+                    {calibrationData.version === 2 ? (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '8px' }}>
+                        <div>
+                          <strong style={{ color: '#818cf8', display: 'block', marginBottom: '4px' }}>Screen Targets</strong>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: '#94a3b8' }}>
+                            <div>• <strong>Center</strong>: Yaw {calibrationData.screen?.center?.yaw ?? 0}°, Pitch {calibrationData.screen?.center?.pitch ?? 0}°, Gaze {calibrationData.screen?.center?.gaze_ratio ?? 0.5}</div>
+                            <div>• <strong>Top-Left</strong>: Yaw {calibrationData.screen?.top_left?.yaw ?? 0}°, Pitch {calibrationData.screen?.top_left?.pitch ?? 0}°, Gaze {calibrationData.screen?.top_left?.gaze_ratio ?? 0.5}</div>
+                            <div>• <strong>Top-Right</strong>: Yaw {calibrationData.screen?.top_right?.yaw ?? 0}°, Pitch {calibrationData.screen?.top_right?.pitch ?? 0}°, Gaze {calibrationData.screen?.top_right?.gaze_ratio ?? 0.5}</div>
+                            <div>• <strong>Bottom-Left</strong>: Yaw {calibrationData.screen?.bottom_left?.yaw ?? 0}°, Pitch {calibrationData.screen?.bottom_left?.pitch ?? 0}°, Gaze {calibrationData.screen?.bottom_left?.gaze_ratio ?? 0.5}</div>
+                            <div>• <strong>Bottom-Right</strong>: Yaw {calibrationData.screen?.bottom_right?.yaw ?? 0}°, Pitch {calibrationData.screen?.bottom_right?.pitch ?? 0}°, Gaze {calibrationData.screen?.bottom_right?.gaze_ratio ?? 0.5}</div>
+                          </div>
+                        </div>
+                        <div>
+                          <strong style={{ color: '#10b981', display: 'block', marginBottom: '4px' }}>Keyboard Targets</strong>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontSize: '11px', color: '#94a3b8' }}>
+                            <div>• <strong>Center</strong>: Yaw {calibrationData.keyboard?.center?.yaw ?? 0}°, Pitch {calibrationData.keyboard?.center?.pitch ?? 0}°</div>
+                            <div>• <strong>Top-Left</strong>: Yaw {calibrationData.keyboard?.top_left?.yaw ?? 0}°, Pitch {calibrationData.keyboard?.top_left?.pitch ?? 0}°</div>
+                            <div>• <strong>Top-Right</strong>: Yaw {calibrationData.keyboard?.top_right?.yaw ?? 0}°, Pitch {calibrationData.keyboard?.top_right?.pitch ?? 0}°</div>
+                            <div>• <strong>Bottom-Left</strong>: Yaw {calibrationData.keyboard?.bottom_left?.yaw ?? 0}°, Pitch {calibrationData.keyboard?.bottom_left?.pitch ?? 0}°</div>
+                            <div>• <strong>Bottom-Right</strong>: Yaw {calibrationData.keyboard?.bottom_right?.yaw ?? 0}°, Pitch {calibrationData.keyboard?.bottom_right?.pitch ?? 0}°</div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div>• <strong>Active Screen</strong>: Yaw {calibrationData.screen?.yaw}°, Pitch {calibrationData.screen?.pitch}°</div>
+                        <div>• <strong>Distraction (Phone/Lap)</strong>: Yaw {calibrationData.distract?.yaw}°, Pitch {calibrationData.distract?.pitch}°</div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div style={{ padding: '12px', backgroundColor: 'rgba(245, 158, 11, 0.05)', border: '1px dashed #f59e0b', borderRadius: '8px', fontSize: '12px', color: '#fef3c7', display: 'flex', gap: '10px', alignItems: 'center' }}>
@@ -526,12 +561,18 @@ const Settings: React.FC = () => {
                   </div>
                 )}
               </div>
-
-              <div style={{ display: 'flex' }}>
+ 
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <Button variant="secondary" size="md" onClick={() => setShowCalibration(true)}>
                   <Camera size={14} style={{ marginRight: '6px' }} />
                   <span>{calibrationData ? 'Recalibrate Tracker' : 'Calibrate Tracker'}</span>
                 </Button>
+                {calibrationData && (
+                  <Button variant="ghost" size="md" onClick={handleResetCalibration} style={{ border: '1px solid #272738' }}>
+                    <RotateCcw size={14} style={{ marginRight: '6px' }} />
+                    <span>Reset to Default</span>
+                  </Button>
+                )}
               </div>
             </div>
           )}

@@ -52,12 +52,14 @@ async function closeWindowsOnWindows(keywords: string[]): Promise<void> {
     `$keywords = @(${psArray});`,
     `Get-Process -Name ${browserNames} -ErrorAction SilentlyContinue | Where-Object {`,
     `  $title = $_.MainWindowTitle;`,
+    `  $match = $false;`,
     `  if ($title) {`,
     `    foreach ($k in $keywords) {`,
-    `      if ($title.ToLower().Contains($k.ToLower())) { return $true }`,
+    `      if ($title.ToLower().Contains($k.ToLower())) { $match = $true; break }`,
     `    }`,
     `  };`,
-    `  return $false`,
+    `  $match`,
+
     `} | ForEach-Object { $_.CloseMainWindow() }`
   ].join(' ')
 

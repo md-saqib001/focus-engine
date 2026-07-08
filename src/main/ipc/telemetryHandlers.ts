@@ -20,18 +20,20 @@ import { mouseTracker } from '../telemetry/mouseTracker'
 import { distractionDetector } from '../telemetry/distractionDetector'
 import { getForSession as getDistractionEvents } from '../database/distractionEventsRepository'
 import { telemetryHealthCheck } from '../telemetry/telemetryHealthCheck'
+import { bufferOrchestrator } from '../buffer/bufferOrchestrator'
 
 export function registerTelemetryHandlers(): void {
-  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking + distraction detector + health checker
+  // telemetry:start — starts window tracking + KPM tracking + Mouse tracking + distraction detector + health checker + buffer orchestrator
   ipcMain.handle(
     'telemetry:start',
-    async (_event, args: { sessionId: string }) => {
+    async (_event, args: { sessionId: string; mode: 'pomodoro' | 'standard' }) => {
       try {
         telemetryPoller.start(args.sessionId)
         kpmTracker.start(args.sessionId)
         mouseMetricsTracker.start(args.sessionId)
         distractionDetector.start(args.sessionId)
         telemetryHealthCheck.start(args.sessionId)
+        bufferOrchestrator.start(args.sessionId, args.mode)
         return { success: true }
       } catch (error: any) {
         console.error('[IPC telemetry:start]', error)
@@ -40,7 +42,7 @@ export function registerTelemetryHandlers(): void {
     }
   )
 
-  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking + distraction detector + health checker
+  // telemetry:stop — stops window tracking + KPM tracking + Mouse tracking + distraction detector + health checker + buffer orchestrator
   ipcMain.handle('telemetry:stop', async () => {
     try {
       telemetryPoller.stop()
@@ -48,6 +50,7 @@ export function registerTelemetryHandlers(): void {
       mouseMetricsTracker.stop()
       distractionDetector.stop()
       telemetryHealthCheck.stop()
+      bufferOrchestrator.stop()
       return { success: true }
     } catch (error: any) {
       console.error('[IPC telemetry:stop]', error)

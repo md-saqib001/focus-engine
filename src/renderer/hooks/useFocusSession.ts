@@ -14,6 +14,7 @@ export interface SessionSummary {
   end_reason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
   apps_killed_count: number
   apps_killed: string[]
+  auto_paused_count?: number
 }
 
 export const useFocusSession = () => {
@@ -34,6 +35,9 @@ export const useFocusSession = () => {
     idleSeconds: 0
   })
   const [healthStatus, setHealthStatus] = useState<{ window: boolean; kpm: boolean; mouse: boolean } | null>(null)
+  const [showAutoPauseModal, setShowAutoPauseModal] = useState(false)
+  const [showForceEndModal, setShowForceEndModal] = useState(false)
+  const autoPausedCountRef = useRef<number>(0)
 
   // Track state to prevent duplicate database writes
   const sessionIdRef = useRef<string>('')
@@ -72,44 +76,6 @@ export const useFocusSession = () => {
       isBlockingSessionRef.current = false
     }
   }, [])
-
-  // Listen to live telemetry updates from the main process
-  useEffect(() => {
-    const unsubscribe = window.focusEngineAPI.onActiveWindowUpdate((info) => {
-      setActiveWindow(info)
-    })
-    const unsubscribeKpm = window.focusEngineAPI.onKpmUpdate((kpmVal) => {
-      setKpm(kpmVal)
-    })
-    const unsubscribeActivity = window.focusEngineAPI.onActivityUpdate((act) => {
-      setActivity(act)
-    })
-    return () => {
-      unsubscribe()
-      unsubscribeKpm()
-      unsubscribeActivity()
-    }
-  }, [])
-
-  // Subscribe to real-time health checker warnings
-  useEffect(() => {
-    if (timer.state === 'running' || timer.state === 'paused') {
-      const unsub = window.focusEngineAPI.onTelemetryHealthWarning((status) => {
-        if (!status.window || !status.kpm || !status.mouse) {
-          setHealthStatus(status)
-        } else {
-          setHealthStatus(null)
-        }
-      })
-      return () => {
-        unsub()
-        setHealthStatus(null)
-      }
-    } else {
-      setHealthStatus(null)
-      return undefined
-    }
-  }, [timer.state])
 
   const {
     getElapsedSeconds,
@@ -154,7 +120,8 @@ export const useFocusSession = () => {
             durationPlannedSec: totalDurationSeconds,
             durationActualSec: actualDuration,
             completed,
-            endReason: endReason as 'auto_complete' | 'abandoned'
+            endReason: endReason as 'auto_complete' | 'abandoned',
+            autoPausedCount: autoPausedCountRef.current
           }
         : {
             sessionId: sessionIdRef.current,
@@ -164,7 +131,8 @@ export const useFocusSession = () => {
             endTime,
             durationActualSec: actualDuration,
             completed,
-            endReason: endReason as 'manual_stop' | 'force_ended'
+            endReason: endReason as 'manual_stop' | 'force_ended',
+            autoPausedCount: autoPausedCountRef.current
           }
 
       await window.focusEngineAPI.saveSession(saveArgs)
@@ -180,7 +148,8 @@ export const useFocusSession = () => {
         completed,
         end_reason: endReason,
         apps_killed_count: appsKilled.length,
-        apps_killed: appsKilled
+        apps_killed: appsKilled,
+        auto_paused_count: autoPausedCountRef.current
       })
     } catch (err) {
       console.error('[useFocusSession] Failed to save session:', err)
@@ -194,6 +163,61 @@ export const useFocusSession = () => {
     appsKilled,
     performBlockingCleanup
   ])
+
+  // Listen to live telemetry updates from the main process
+  useEffect(() => {
+    const unsubscribe = window.focusEngineAPI.onActiveWindowUpdate((info) => {
+      setActiveWindow(info)
+    })
+    const unsubscribeKpm = window.focusEngineAPI.onKpmUpdate((kpmVal) => {
+      setKpm(kpmVal)
+    })
+    const unsubscribeActivity = window.focusEngineAPI.onActivityUpdate((act) => {
+      setActivity(act)
+    })
+    const unsubscribeAutoPause = window.focusEngineAPI.onSessionAutoPause(() => {
+      timer.pause()
+      setShowAutoPauseModal(true)
+    })
+    const unsubscribeForceEnd = window.focusEngineAPI.onSessionForceEnd(async () => {
+      timer.stop()
+      await finalizeSession(false, 'force_ended')
+      setShowForceEndModal(true)
+    })
+    const unsubscribeBufferUpdate = window.focusEngineAPI.onFocusBufferUpdate((data) => {
+      if (data.autoPausedCount !== undefined) {
+        autoPausedCountRef.current = data.autoPausedCount
+      }
+    })
+    return () => {
+      unsubscribe()
+      unsubscribeKpm()
+      unsubscribeActivity()
+      unsubscribeAutoPause()
+      unsubscribeForceEnd()
+      unsubscribeBufferUpdate()
+    }
+  }, [timer, finalizeSession])
+
+  // Subscribe to real-time health checker warnings
+  useEffect(() => {
+    if (timer.state === 'running' || timer.state === 'paused') {
+      const unsub = window.focusEngineAPI.onTelemetryHealthWarning((status) => {
+        if (!status.window || !status.kpm || !status.mouse) {
+          setHealthStatus(status)
+        } else {
+          setHealthStatus(null)
+        }
+      })
+      return () => {
+        unsub()
+        setHealthStatus(null)
+      }
+    } else {
+      setHealthStatus(null)
+      return undefined
+    }
+  }, [timer.state])
 
   // Watch for natural Pomodoro countdown completion at 0:00
   useEffect(() => {
@@ -276,9 +300,11 @@ export const useFocusSession = () => {
       }
     }
 
+    autoPausedCountRef.current = 0
+
     // Start active window tracking telemetry and CV Engine
     try {
-      await window.focusEngineAPI.startTelemetry(sessionIdRef.current)
+      await window.focusEngineAPI.startTelemetry(sessionIdRef.current, 'pomodoro')
       const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
       if (cvEnabledRes.success && cvEnabledRes.data) {
         await window.focusEngineAPI.startCV(sessionIdRef.current)
@@ -304,6 +330,8 @@ export const useFocusSession = () => {
     sessionIdRef.current = crypto.randomUUID()
     isBlockingSessionRef.current = true
 
+    autoPausedCountRef.current = 0
+
     try {
       const res = await window.focusEngineAPI.startBlocking()
       if (!res.success && res.error) {
@@ -326,7 +354,7 @@ export const useFocusSession = () => {
 
     // Start active window tracking telemetry and CV Engine
     try {
-      await window.focusEngineAPI.startTelemetry(sessionIdRef.current)
+      await window.focusEngineAPI.startTelemetry(sessionIdRef.current, 'standard')
       const cvEnabledRes = await window.focusEngineAPI.getCVEnabled()
       if (cvEnabledRes.success && cvEnabledRes.data) {
         await window.focusEngineAPI.startCV(sessionIdRef.current)
@@ -341,11 +369,13 @@ export const useFocusSession = () => {
     hasSavedRef.current = false
   }, [timer])
 
-  const pauseSession = useCallback(() => {
+  const pauseSession = useCallback(async () => {
+    await window.focusEngineAPI.pauseBuffer()
     timer.pause()
   }, [timer])
 
-  const resumeSession = useCallback(() => {
+  const resumeSession = useCallback(async () => {
+    await window.focusEngineAPI.resumeBuffer()
     timer.resume()
   }, [timer])
 
@@ -408,6 +438,19 @@ export const useFocusSession = () => {
     resumeSession,
     stopSession,
     resetSession,
-    clearSummary
+    clearSummary,
+    showAutoPauseModal,
+    setShowAutoPauseModal,
+    showForceEndModal,
+    setShowForceEndModal,
+    handleResumeFromAutoPause: useCallback(async () => {
+      await window.focusEngineAPI.resumeBuffer()
+      timer.resume()
+      setShowAutoPauseModal(false)
+    }, [timer]),
+    handleEndFromAutoPause: useCallback(async () => {
+      setShowAutoPauseModal(false)
+      await stopSession()
+    }, [stopSession])
   }
 }

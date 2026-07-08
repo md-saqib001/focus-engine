@@ -37,6 +37,7 @@ class AttentionCombiner:
             "pitch": None,
             "roll": None,
             "gaze_direction": None,
+            "gaze_ratio": None,
             "looking_at_screen": False,
             "raw_attention_score": 0.0,
             "smoothed_attention_score": self.smoother.update(0.0) if not face_result else 0.0
@@ -55,23 +56,35 @@ class AttentionCombiner:
         # 1. Head Pose
         pose = HeadPoseEstimator.estimate(face_result.raw_landmarks, frame_width, frame_height)
         head_looking_at_screen = False
+        head_at_keyboard = False
         if pose:
             record["yaw"] = pose["yaw"]
             record["pitch"] = pose["pitch"]
             record["roll"] = pose["roll"]
             head_attention = HeadPoseEstimator.classify_attention(pose["yaw"], pose["pitch"], calibration)
             head_looking_at_screen = (head_attention == "looking_at_screen")
+            head_at_keyboard = (head_attention == "looking_at_keyboard")
 
         # 2. Gaze
         gaze = GazeEstimator.estimate(face_result.raw_landmarks)
         gaze_centered = False
         if gaze:
             record["gaze_direction"] = gaze["direction"]
-            gaze_centered = (gaze["direction"] == "center")
+            record["gaze_ratio"] = gaze["ratio"]
+            # Gaze is not checked for keyboard positions — eyelids partially occlude
+            # the iris when looking down, making ratio unreliable.
+            if not head_at_keyboard:
+                gaze_centered = (gaze["direction"] == "center")
+            else:
+                gaze_centered = True  # Keyboard: assume gaze OK, only head pose matters
 
         # 3. Combine Logic
         raw_score = 0.2
         if head_looking_at_screen and gaze_centered:
+            raw_score = 1.0
+            record["looking_at_screen"] = True
+        elif head_at_keyboard:
+            # Typing/keyboard lookup — productive, not penalized
             raw_score = 1.0
             record["looking_at_screen"] = True
         elif head_looking_at_screen or gaze_centered:

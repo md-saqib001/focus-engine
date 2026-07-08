@@ -25,9 +25,14 @@ export class TelemetryPoller {
   }[] = []
 
   private lastTickTime = 0
+  private lastActiveWindow: BroadcastActiveWindowInfo | null = null
 
   public getLastTickTime(): number {
     return this.lastTickTime
+  }
+
+  public getLastActiveWindow(): BroadcastActiveWindowInfo | null {
+    return this.lastActiveWindow
   }
 
   private readonly BATCH_SIZE = 12
@@ -53,6 +58,7 @@ export class TelemetryPoller {
     this.currentSessionId = sessionId
     this.buffer = [] // Reset buffer on new session start
     this.lastTickTime = Date.now()
+    this.lastActiveWindow = null
 
     const poll = async () => {
       if (!this.currentSessionId) return
@@ -81,6 +87,8 @@ export class TelemetryPoller {
             domain: classification.domain,
             category: classification.category
           }
+
+          this.lastActiveWindow = tickInfo
 
           // 2. Broadcast live update immediately to renderer process (Dashboard live dot)
           this.broadcastUpdate(tickInfo)
@@ -122,6 +130,7 @@ export class TelemetryPoller {
       this.intervalId = null
     }
     this.currentSessionId = null
+    this.lastActiveWindow = null
     console.log('[TelemetryPoller] Stopped polling')
   }
 

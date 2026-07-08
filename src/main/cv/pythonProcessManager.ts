@@ -9,6 +9,7 @@ class PythonCVProcessManager {
   private process: ChildProcess | null = null
   private sessionId: string | null = null
   private stdoutBuffer: string = ''
+  private lastRecord: any = null
 
   /**
    * Starts the CV Engine process for a given session.
@@ -23,6 +24,7 @@ class PythonCVProcessManager {
 
     this.sessionId = sessionId
     this.stdoutBuffer = ''
+    this.lastRecord = null
 
     // Determine path to the virtual environment's python executable
     const isWindows = process.platform === 'win32'
@@ -127,6 +129,7 @@ class PythonCVProcessManager {
 
         // We expect normal JSON from main_loop.py to have a 'frame' or 'ts' key
         if (record.ts && this.sessionId) {
+          this.lastRecord = record
           // It's a telemetry record! Persist to database.
           cvMetricsRepository.insertCVMetric({
             session_id: this.sessionId,
@@ -182,6 +185,14 @@ class PythonCVProcessManager {
 
     // Try graceful exit first
     this.process.kill('SIGTERM')
+    this.lastRecord = null
+  }
+
+  /**
+   * Retrieves the last parsed CV telemetry record.
+   */
+  public getLastRecord(): any {
+    return this.lastRecord
   }
 }
 

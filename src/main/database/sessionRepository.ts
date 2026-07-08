@@ -11,6 +11,7 @@ export interface SessionRow {
   completed: number // 0 or 1 (SQLite doesn't have booleans)
   end_reason: string | null
   focus_score: number | null
+  auto_paused_count: number
   created_at: number
   apps_killed?: number
 }
@@ -34,6 +35,7 @@ export function saveSession(params: {
   durationActualSec: number
   completed: boolean
   endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
+  autoPausedCount?: number
 }): SessionRow {
   const {
     sessionId,
@@ -44,7 +46,8 @@ export function saveSession(params: {
     durationPlannedSec,
     durationActualSec,
     completed,
-    endReason
+    endReason,
+    autoPausedCount = 0
   } = params
 
   // Validate mode contract
@@ -80,9 +83,10 @@ export function saveSession(params: {
   const stmt = db.prepare(`
     INSERT INTO sessions (
       session_id, session_mode, session_type, start_time, end_time,
-      duration_planned_sec, duration_actual_sec, completed, end_reason, created_at
+      duration_planned_sec, duration_actual_sec, completed, end_reason, created_at,
+      auto_paused_count
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   stmt.run(
@@ -95,7 +99,8 @@ export function saveSession(params: {
     durationActualSec,
     completed ? 1 : 0,
     endReason,
-    startTime // Use session start time as created_at baseline
+    startTime,
+    autoPausedCount
   )
 
   return {
@@ -109,6 +114,7 @@ export function saveSession(params: {
     completed: completed ? 1 : 0,
     end_reason: endReason,
     focus_score: null,
+    auto_paused_count: autoPausedCount,
     created_at: startTime
   }
 }
@@ -133,8 +139,26 @@ export function getAllSessions(): SessionRow[] {
  */
 export function getSessionById(sessionId: string): SessionRow | null {
   const db = getDatabase()
-  const stmt = db.prepare(`SELECT * FROM sessions WHERE session_id = ?`)
+  const stmt = db.prepare(`
+    SELECT s.*, COUNT(e.id) as apps_killed
+    FROM sessions s
+    LEFT JOIN app_kill_events e ON s.session_id = e.session_id
+    WHERE s.session_id = ?
+    GROUP BY s.session_id
+  `)
   return (stmt.get(sessionId) as SessionRow) || null
+}
+
+/**
+ * Updates the focus_score for a completed session.
+ */
+export function updateSessionFocusScore(sessionId: string, focusScore: number): void {
+  const db = getDatabase()
+  db.prepare(`
+    UPDATE sessions
+    SET focus_score = ?
+    WHERE session_id = ?
+  `).run(focusScore, sessionId)
 }
 
 /**

@@ -24,6 +24,7 @@ export function registerSessionHandlers(): void {
         durationActualSec: number
         completed: boolean
         endReason: 'auto_complete' | 'manual_stop' | 'abandoned' | 'force_ended'
+        autoPausedCount?: number
       }
     ) => {
       try {

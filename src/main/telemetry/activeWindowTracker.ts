@@ -51,13 +51,15 @@ async function getWindowsActiveWindow(): Promise<ActiveWindowInfo | null> {
     }
     $hwnd = [Win32.ActiveWin]::GetForegroundWindow()
     if ($hwnd -ne [IntPtr]::Zero) {
-      $pid = 0
-      [Win32.ActiveWin]::GetWindowThreadProcessId($hwnd, [ref]$pid)
-      $title = New-Object System.Text.StringBuilder(512)
-      [Win32.ActiveWin]::GetWindowText($hwnd, $title, 512)
-      $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
-      if ($proc) {
-        Write-Output ($proc.ProcessName + "|||" + $title.ToString())
+      $targetPid = 0
+      [void][Win32.ActiveWin]::GetWindowThreadProcessId($hwnd, [ref]$targetPid)
+      if ($targetPid -ne $PID) {
+        $title = New-Object System.Text.StringBuilder(512)
+        [void][Win32.ActiveWin]::GetWindowText($hwnd, $title, 512)
+        $proc = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
+        if ($proc) {
+          Write-Output ($proc.ProcessName + "|||" + $title.ToString())
+        }
       }
     }
   `.trim()

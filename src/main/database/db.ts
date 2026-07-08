@@ -30,6 +30,7 @@ export function getDatabase(): Database.Database {
       completed INTEGER NOT NULL DEFAULT 0,
       end_reason TEXT,
       focus_score REAL,
+      auto_paused_count INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL DEFAULT (unixepoch()*1000)
     );
   `)
@@ -105,6 +106,20 @@ export function getDatabase(): Database.Database {
     }
   } catch (err) {
     console.error('[DB] Failed window_focus table migration check:', err)
+  }
+
+  // Migrate sessions table to add auto_paused_count column if missing
+  try {
+    const columns = db.pragma("table_info(sessions)") as { name: string }[]
+    if (columns.length > 0) {
+      const hasAutoPaused = columns.some((c) => c.name === 'auto_paused_count')
+      if (!hasAutoPaused) {
+        console.log('[DB] Migrating sessions table: Adding auto_paused_count column...')
+        db.exec('ALTER TABLE sessions ADD COLUMN auto_paused_count INTEGER NOT NULL DEFAULT 0;')
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Failed sessions table migration check:', err)
   }
 
   // Create index on session_id for quick history lookups
@@ -198,6 +213,36 @@ export function getDatabase(): Database.Database {
       setting_key TEXT PRIMARY KEY,
       setting_value TEXT NOT NULL
     );
+  `)
+
+  // Create buffer_snapshots table (kept forever)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS buffer_snapshots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      value REAL NOT NULL,
+      timestamp INTEGER NOT NULL
+    );
+  `)
+  
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_buffer_snapshots_session_id ON buffer_snapshots(session_id);
+  `)
+
+  // Create buffer_state_transitions table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS buffer_state_transitions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      state TEXT NOT NULL,
+      start_time INTEGER NOT NULL,
+      end_time INTEGER,
+      duration INTEGER
+    );
+  `)
+  
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_buffer_state_transitions_session_id ON buffer_state_transitions(session_id);
   `)
 
   // Seed blocked_domains if empty

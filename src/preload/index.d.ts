@@ -86,17 +86,13 @@ interface FocusEngineAPI {
   setCVEnabled: (enabled: boolean) => Promise<IPCResult<void>>
   getCVPermission: () => Promise<IPCResult<'granted' | 'denied' | 'pending'>>
   setCVPermission: (permission: 'granted' | 'denied' | 'pending') => Promise<IPCResult<void>>
-  getCalibration: () => Promise<IPCResult<{
-    screen: { yaw: number; pitch: number }
-    distract: { yaw: number; pitch: number }
-  } | null>>
-  setCalibration: (calibration: {
-    screen: { yaw: number; pitch: number }
-    distract: { yaw: number; pitch: number }
-  }) => Promise<IPCResult<void>>
+  getCalibration: () => Promise<IPCResult<any>>
+  setCalibration: (calibration: any) => Promise<IPCResult<void>>
+  getDefaultCalibration: () => Promise<IPCResult<any>>
+  resetCalibrationToDefault: () => Promise<IPCResult<void>>
 
   // Telemetry endpoints
-  startTelemetry: (sessionId: string) => Promise<IPCResult<void>>
+  startTelemetry: (sessionId: string, mode: 'pomodoro' | 'standard') => Promise<IPCResult<void>>
   stopTelemetry: () => Promise<IPCResult<void>>
   getWindowHistory: (sessionId: string) => Promise<IPCResult<any[]>>
   getCategoryBreakdown: (sessionId: string) => Promise<IPCResult<any[]>>
@@ -181,14 +177,80 @@ interface FocusEngineAPI {
       pitch: number | null
       roll: number | null
       gaze_direction: string | null
+      gaze_ratio: number | null
       looking_at_screen: boolean
       raw_attention_score: number
       smoothed_attention_score: number
       ts: number
       frame: number
+      preview_frame?: string
     }) => void
   ) => () => void
   onCVError: (callback: (error: string) => void) => () => void
+  getCurrentFocusBuffer: () => Promise<IPCResult<{
+    value: number
+    state: string
+    history: { timestamp: number; value: number }[]
+    signals?: {
+      cv: number
+      keyboard: number
+      mouse: number
+      window: number
+    }
+    isWarmup?: boolean
+    autoPausedCount?: number
+  }>>
+  resumeBuffer: () => Promise<IPCResult<void>>
+  pauseBuffer: () => Promise<IPCResult<void>>
+  validateAllBufferData: () => Promise<IPCResult<any>>
+  onFocusBufferUpdate: (
+    callback: (data: {
+      value: number
+      state: string
+      history: { timestamp: number; value: number }[]
+      signals?: {
+        cv: number
+        keyboard: number
+        mouse: number
+        window: number
+      }
+      isWarmup?: boolean
+      autoPausedCount?: number
+    }) => void
+  ) => () => void
+  onSessionAutoPause: (callback: (data: { reason: string }) => void) => () => void
+  onSessionForceEnd: (callback: (data: { reason: string }) => void) => () => void
+  getBufferSnapshots: (sessionId: string) => Promise<IPCResult<{
+    id: number
+    session_id: string
+    value: number
+    timestamp: number
+  }[]>>
+  auditSessionBuffer: (sessionId: string) => Promise<IPCResult<{
+    sessionId: string
+    windowStaleAlerts: { timestamp: number; timeGapSec: number }[]
+    cvStaleAlerts: { timestamp: number; timeGapSec: number }[]
+    doublePenaltyAlerts: { domain: string; timeDiffSec: number; timestamp: number }[]
+    cvArchived: boolean
+  }>>
+  onFocusBufferStateChanged: (
+    callback: (data: {
+      previousState: string
+      newState: string
+      durationInPreviousState: number
+    }) => void
+  ) => () => void
+  getBufferStateTransitions: (sessionId: string) => Promise<IPCResult<{
+    id: number
+    session_id: string
+    state: string
+    start_time: number
+    end_time: number | null
+    duration: number | null
+  }[]>>
+  getBufferStateTimeSummary: (sessionId: string) => Promise<IPCResult<{
+    [state: string]: number
+  }>>
 }
 
 declare global {

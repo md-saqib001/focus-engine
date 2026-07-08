@@ -131,51 +131,77 @@ class HeadPoseEstimator:
     def classify_attention(yaw: float, pitch: float, calibration: dict = None) -> str:
         """
         Classify attention based on yaw and pitch angles.
-        
+
+        With a v2 10-point calibration dict, uses screen/keyboard bounding boxes.
+        Falls back to generic thresholds if calibration is missing or malformed.
+
         Parameters
         ----------
-        yaw : float
-            Yaw angle in degrees.
-        pitch : float
-            Pitch angle in degrees.
-        calibration : dict, optional
-            Calibration baselines JSON containing screen and distract yaw/pitch.
-            
+        yaw : float   — Yaw angle in degrees.
+        pitch : float — Pitch angle in degrees.
+        calibration : dict, optional — v2 calibration JSON.
+
         Returns
         -------
-        str
-            "looking_at_screen" or "looking_away"
+        str — "looking_at_screen", "looking_at_keyboard", or "looking_away"
         """
-        if calibration and "screen" in calibration and "distract" in calibration:
+        if calibration:
             try:
-                screen_yaw = calibration["screen"]["yaw"]
-                screen_pitch = calibration["screen"]["pitch"]
-                distract_yaw = calibration["distract"]["yaw"]
-                distract_pitch = calibration["distract"]["pitch"]
+                version = calibration.get("version", 1)
 
-                # Pitch: looking down at lap is main distract cue (lower pitch)
-                pitch_mid = (screen_pitch + distract_pitch) / 2.0
-                pitch_tol = max(15.0, abs(screen_pitch - pitch_mid))
-                pitch_min = screen_pitch - pitch_tol
-                pitch_max = screen_pitch + pitch_tol
+                if version == 2:
+                    # --- v2 10-point bounding box approach ---
+                    # Build combined focus hull: screen + keyboard points
+                    screen_points = list(calibration.get("screen", {}).values())
+                    keyboard_points = list(calibration.get("keyboard", {}).values())
+                    all_points = screen_points + keyboard_points
 
-                # Yaw: looking away to sides
-                yaw_diff = abs(screen_yaw - distract_yaw)
-                yaw_tol = max(25.0, yaw_diff)
-                yaw_min = screen_yaw - yaw_tol
-                yaw_max = screen_yaw + yaw_tol
+                    def _in_hull(pts, y, p, margin_yaw=5.0, margin_pitch=5.0):
+                        """True if (y, p) is within the bounding box of pts with margin."""
+                        if not pts:
+                            return False
+                        yaws = [pt["yaw"] for pt in pts]
+                        pitches = [pt["pitch"] for pt in pts]
+                        return (
+                            (min(yaws) - margin_yaw) <= y <= (max(yaws) + margin_yaw) and
+                            (min(pitches) - margin_pitch) <= p <= (max(pitches) + margin_pitch)
+                        )
 
-                if yaw_min <= yaw <= yaw_max and pitch_min <= pitch <= pitch_max:
-                    return "looking_at_screen"
-                else:
-                    return "looking_away"
-            except (KeyError, TypeError) as e:
-                # Handle corrupted calibration format, fall back to generic
-                pass
+                    if _in_hull(all_points, yaw, pitch):
+                        # Focused! Classify whether gaze check is needed
+                        # If pitch is low (downward looking), treat as looking at keyboard to bypass gaze check
+                        keyboard_pitches = [pt["pitch"] for pt in keyboard_points]
+                        max_kb_pitch = max(keyboard_pitches) if keyboard_pitches else -10.0
+                        if pitch <= max_kb_pitch + 2.0:
+                            return "looking_at_keyboard"
+                        else:
+                            return "looking_at_screen"
+                    else:
+                        return "looking_away"
+
+                elif version == 1:
+                    # --- Legacy v1 2-point approach ---
+                    if "screen" in calibration and "distract" in calibration:
+                        screen_yaw = calibration["screen"]["yaw"]
+                        screen_pitch = calibration["screen"]["pitch"]
+                        distract_yaw = calibration["distract"]["yaw"]
+                        distract_pitch = calibration["distract"]["pitch"]
+
+                        pitch_mid = (screen_pitch + distract_pitch) / 2.0
+                        pitch_tol = max(15.0, abs(screen_pitch - pitch_mid))
+                        yaw_diff = abs(screen_yaw - distract_yaw)
+                        yaw_tol = max(25.0, yaw_diff)
+
+                        if (screen_yaw - yaw_tol <= yaw <= screen_yaw + yaw_tol and
+                                screen_pitch - pitch_tol <= pitch <= screen_pitch + pitch_tol):
+                            return "looking_at_screen"
+                        else:
+                            return "looking_away"
+
+            except (KeyError, TypeError, AttributeError):
+                pass  # Fall through to default
 
         # Fall back to default loosened thresholds
-        # - Smile deformation pulls mouth points up, artificially shifting pitch
-        # - Bending/leaning adds natural pitch/yaw
         if abs(yaw) < 35 and -30 < pitch < 30:
             return "looking_at_screen"
         else:

@@ -144,9 +144,17 @@ const focusEngineAPI = {
     return ipcRenderer.invoke('settings:setCalibration', calibration)
   },
 
+  getDefaultCalibration: () => {
+    return ipcRenderer.invoke('settings:getDefaultCalibration')
+  },
+
+  resetCalibrationToDefault: () => {
+    return ipcRenderer.invoke('settings:resetCalibrationToDefault')
+  },
+
   // Telemetry endpoints
-  startTelemetry: (sessionId: string) => {
-    return ipcRenderer.invoke('telemetry:start', { sessionId })
+  startTelemetry: (sessionId: string, mode: 'pomodoro' | 'standard') => {
+    return ipcRenderer.invoke('telemetry:start', { sessionId, mode })
   },
 
   stopTelemetry: () => {
@@ -279,6 +287,76 @@ const focusEngineAPI = {
     return () => {
       ipcRenderer.removeListener('cv:error', subscription)
     }
+  },
+
+  getCurrentFocusBuffer: () => {
+    return ipcRenderer.invoke('buffer:getCurrent')
+  },
+
+  resumeBuffer: () => {
+    return ipcRenderer.invoke('buffer:resume')
+  },
+
+  pauseBuffer: () => {
+    return ipcRenderer.invoke('buffer:pause')
+  },
+
+  validateAllBufferData: () => {
+    return ipcRenderer.invoke('buffer:validateAll')
+  },
+
+  onFocusBufferUpdate: (callback: (data: any) => void) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('buffer:update', subscription)
+    return () => {
+      ipcRenderer.removeListener('buffer:update', subscription)
+    }
+  },
+
+  onSessionAutoPause: (callback: (data: { reason: string }) => void) => {
+    const subscription = (_event: any, data: { reason: string }) => callback(data)
+    ipcRenderer.on('session:autoPause', subscription)
+    return () => {
+      ipcRenderer.removeListener('session:autoPause', subscription)
+    }
+  },
+
+  onSessionForceEnd: (callback: (data: { reason: string }) => void) => {
+    const subscription = (_event: any, data: { reason: string }) => callback(data)
+    ipcRenderer.on('session:forceEnd', subscription)
+    return () => {
+      ipcRenderer.removeListener('session:forceEnd', subscription)
+    }
+  },
+
+  onFocusBufferStateChanged: (
+    callback: (data: {
+      previousState: string
+      newState: string
+      durationInPreviousState: number
+    }) => void
+  ) => {
+    const subscription = (_event: any, data: any) => callback(data)
+    ipcRenderer.on('buffer:stateChanged', subscription)
+    return () => {
+      ipcRenderer.removeListener('buffer:stateChanged', subscription)
+    }
+  },
+
+  getBufferSnapshots: (sessionId: string) => {
+    return ipcRenderer.invoke('buffer:getSnapshots', { sessionId })
+  },
+
+  auditSessionBuffer: (sessionId: string) => {
+    return ipcRenderer.invoke('buffer:auditSession', { sessionId })
+  },
+
+  getBufferStateTransitions: (sessionId: string) => {
+    return ipcRenderer.invoke('buffer:getStateTransitions', { sessionId })
+  },
+
+  getBufferStateTimeSummary: (sessionId: string) => {
+    return ipcRenderer.invoke('buffer:getStateTimeSummary', { sessionId })
   }
 }
 

@@ -37,6 +37,22 @@ export function getForSession(sessionId: string): DistractionEventRow[] {
 }
 
 /**
+ * Retrieves distraction events logged after a certain timestamp for a session.
+ */
+export function getEventsSince(
+  sessionId: string,
+  timestamp: number
+): DistractionEventRow[] {
+  const db = getDatabase()
+  return db.prepare(`
+    SELECT id, session_id, event_type, event_data, timestamp
+    FROM distraction_events
+    WHERE session_id = ? AND timestamp > ?
+    ORDER BY timestamp ASC
+  `).all(sessionId, timestamp) as DistractionEventRow[]
+}
+
+/**
  * Retrieves distraction event counts grouped by event type for a session.
  */
 export function getEventCounts(sessionId: string): { [type: string]: number } {

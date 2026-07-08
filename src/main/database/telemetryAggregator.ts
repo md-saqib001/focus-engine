@@ -1,6 +1,7 @@
 import { getDatabase } from './db'
 import { getSessionById } from './sessionRepository'
 import { getCategoryBreakdown } from './windowFocusRepository'
+import { calculateFocusScore, FocusScoreComponents } from '../buffer/focusScoreCalculator'
 
 export interface TelemetrySummary {
   sessionId: string
@@ -21,6 +22,10 @@ export interface TelemetrySummary {
   maxIdleDuration: number
   mostUsedApp: string | null
   mostDistractingDomain: string | null
+  totalPauses: number
+  distractionsAttempted: number
+  focusScore: number | null
+  focusScoreComponents: FocusScoreComponents | null
 }
 
 /**
@@ -86,6 +91,37 @@ export function getSessionTelemetrySummary(sessionId: string): TelemetrySummary 
   `).get(sessionId) as { domain: string, count: number } | null
   const mostDistractingDomain = distractingDomainStats ? distractingDomainStats.domain : null
 
+  // 6. Pause Events
+  const pauseStats = db.prepare(`
+    SELECT COUNT(*) as manual_pauses
+    FROM buffer_state_transitions
+    WHERE session_id = ? AND state = 'PAUSED'
+  `).get(sessionId) as { manual_pauses: number } | undefined
+  const totalPauses = (session.auto_paused_count || 0) + (pauseStats?.manual_pauses || 0)
+
+  // 7. Distractions Attempted
+  const focusRows = db.prepare(`
+    SELECT category
+    FROM window_focus
+    WHERE session_id = ?
+    ORDER BY timestamp ASC
+  `).all(sessionId) as { category: string }[]
+
+  let distractionSwitches = 0
+  let prevCategory = ''
+  for (const row of focusRows) {
+    if (row.category === 'distraction' && prevCategory !== 'distraction') {
+      distractionSwitches++
+    }
+    prevCategory = row.category || ''
+  }
+  const appsKilledCount = session.apps_killed || 0
+  const distractionsAttempted = appsKilledCount + distractionSwitches
+
+  // 8. Focus Score Components
+  const focusScoreComponents = calculateFocusScore(sessionId)
+  const focusScore = focusScoreComponents ? focusScoreComponents.finalScore : null
+
   return {
     sessionId: session.session_id,
     sessionMode: session.session_mode,
@@ -102,6 +138,10 @@ export function getSessionTelemetrySummary(sessionId: string): TelemetrySummary 
     movementEvents,
     maxIdleDuration,
     mostUsedApp,
-    mostDistractingDomain
+    mostDistractingDomain,
+    totalPauses,
+    distractionsAttempted,
+    focusScore,
+    focusScoreComponents
   }
 }

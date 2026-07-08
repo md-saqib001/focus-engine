@@ -87,7 +87,15 @@ export function classifyWindow(appName: string, windowTitle: string): Classifica
     }
   }
 
-  // 5. Check neutral processes (e.g. system controls, explorer, finder)
+  // 5. Check for Focus Engine app itself (including development Electron processes)
+  if (appLower.includes('focus engine') || appLower.includes('electron') || titleLower.includes('focus engine')) {
+    return {
+      domain: 'focus-engine',
+      category: 'productive'
+    }
+  }
+
+  // 6. Check neutral processes (e.g. system controls, explorer, finder)
   const neutralKeywords = ['explorer', 'finder', 'taskmgr', 'systemsettings', 'system preferences', 'desktop']
   if (neutralKeywords.some((nk) => appLower.includes(nk))) {
     return {

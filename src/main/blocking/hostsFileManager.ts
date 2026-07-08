@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { join } from 'path'
 import * as fs from 'fs'
+import { startWatchdog, stopWatchdog } from './watchdogManager'
 
 const BLOCK_START_MARKER = '# FOCUS_ENGINE_BLOCK_START'
 const BLOCK_END_MARKER = '# FOCUS_ENGINE_BLOCK_END'
@@ -79,6 +80,7 @@ export async function blockDomains(domains: string[]): Promise<void> {
   if (domains.length === 0) {
     try {
       await fs.promises.writeFile(hostsPath, content, 'utf8')
+      stopWatchdog()
       return
     } catch (error: any) {
       handleWriteError(error)
@@ -101,6 +103,7 @@ export async function blockDomains(domains: string[]): Promise<void> {
   try {
     await fs.promises.writeFile(hostsPath, updatedContent, 'utf8')
     console.log('[HostsManager] Web blocking active. Blocked domains:', domains)
+    startWatchdog(hostsPath)
   } catch (error: any) {
     handleWriteError(error)
   }
@@ -123,6 +126,7 @@ export async function restoreHosts(): Promise<void> {
     const cleaned = stripBlockingBlock(content)
     await fs.promises.writeFile(hostsPath, cleaned, 'utf8')
     console.log('[HostsManager] Web blocking deactivated. Hosts restored.')
+    stopWatchdog()
   } catch (error: any) {
     console.error('[HostsManager] Failed to restore hosts file:', error)
   }
@@ -143,6 +147,7 @@ export function restoreHostsSync(): void {
     const cleaned = stripBlockingBlock(content)
     fs.writeFileSync(hostsPath, cleaned, 'utf8')
     console.log('[HostsManager] Web blocking deactivated (sync shutdown). Hosts restored.')
+    stopWatchdog()
   } catch (error: any) {
     console.error('[HostsManager] Failed to restore hosts file on shutdown:', error)
   }

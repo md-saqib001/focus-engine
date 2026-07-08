@@ -8,7 +8,9 @@ import { registerBlockingHandlers } from './ipc/blockingHandlers'
 import { registerAppBlockingHandlers } from './ipc/appBlockingHandlers'
 import { registerTelemetryHandlers } from './ipc/telemetryHandlers'
 import { registerCVHandlers } from './ipc/cvHandlers'
+import { registerBufferHandlers } from './ipc/bufferHandlers'
 import { restoreHostsSync } from './blocking/hostsFileManager'
+import { settingsRepository } from './database/settingsRepository'
 
 function createWindow(): void {
   // Create the browser window.
@@ -63,12 +65,16 @@ app.whenReady().then(() => {
   // Initialize database (creates file + schema if first run)
   getDatabase()
 
+  // Seed default calibration values if this is first launch
+  settingsRepository.seedDefaultsIfNeeded()
+
   // Register all IPC handlers
   registerSessionHandlers()
   registerBlockingHandlers()
   registerAppBlockingHandlers()
   registerTelemetryHandlers()
   registerCVHandlers()
+  registerBufferHandlers()
 
   createWindow()
 

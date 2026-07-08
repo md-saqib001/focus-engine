@@ -74,8 +74,8 @@ export function registerCVHandlers(): void {
 
   ipcMain.handle('settings:getCalibration', () => {
     try {
-      const rawData = settingsRepository.getSetting('cv_calibration', '')
-      return { success: true, data: rawData ? JSON.parse(rawData) : null }
+      // Uses settingsRepository.getCalibration() which falls back to v2 defaults
+      return { success: true, data: settingsRepository.getCalibration() }
     } catch (err: any) {
       return { success: false, error: err.message }
     }
@@ -83,7 +83,24 @@ export function registerCVHandlers(): void {
 
   ipcMain.handle('settings:setCalibration', (_event, calibration: any) => {
     try {
-      settingsRepository.setSetting('cv_calibration', JSON.stringify(calibration))
+      settingsRepository.setCalibration(calibration)
+      return { success: true }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  ipcMain.handle('settings:getDefaultCalibration', () => {
+    try {
+      return { success: true, data: settingsRepository.getDefaultCalibration() }
+    } catch (err: any) {
+      return { success: false, error: err.message }
+    }
+  })
+
+  ipcMain.handle('settings:resetCalibrationToDefault', () => {
+    try {
+      settingsRepository.resetCalibrationToDefault()
       return { success: true }
     } catch (err: any) {
       return { success: false, error: err.message }

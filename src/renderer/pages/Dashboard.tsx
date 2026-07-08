@@ -8,6 +8,8 @@ import { Play, Pause, Square, RotateCcw, X, ShieldAlert, CheckCircle, AlertCircl
 import { SessionType } from '../types/timer'
 import CVPermissionPrompt from '../components/CVPermissionPrompt'
 import CVAttentionPanel from '../components/CVAttentionPanel'
+import FocusBufferGauge from '../components/FocusBufferGauge'
+import BufferSignalBreakdown from '../components/BufferSignalBreakdown'
 
 const DashboardContent: React.FC = () => {
   const {
@@ -28,7 +30,12 @@ const DashboardContent: React.FC = () => {
     resumeSession,
     stopSession,
     resetSession,
-    clearSummary
+    clearSummary,
+    showAutoPauseModal,
+    showForceEndModal,
+    setShowForceEndModal,
+    handleResumeFromAutoPause,
+    handleEndFromAutoPause
   } = useFocusSessionContext()
 
   // Selected session type for Pomodoro mode (defaults to focus)
@@ -48,6 +55,19 @@ const DashboardContent: React.FC = () => {
   // CV permission and enabled states
   const [cvPermission, setCvPermission] = useState<'granted' | 'denied' | 'pending'>('pending')
   const [cvEnabled, setCvEnabled] = useState(false)
+
+  // Full comprehensive summary fetched after session completes
+  const [fullSummary, setFullSummary] = useState<any | null>(null)
+
+  useEffect(() => {
+    if (summary && summary.session_id) {
+      window.focusEngineAPI.getSessionSummary(summary.session_id).then((res) => {
+        if (res.success && res.data) setFullSummary(res.data)
+      }).catch(err => console.error(err))
+    } else {
+      setFullSummary(null)
+    }
+  }, [summary])
 
   useEffect(() => {
     const fetchCVSettings = async () => {
@@ -106,7 +126,7 @@ const DashboardContent: React.FC = () => {
       case 'auto_complete': return 'Session completed automatically'
       case 'manual_stop': return 'You stopped this session manually'
       case 'abandoned': return 'Session was abandoned'
-      case 'force_ended': return 'Session was force ended'
+      case 'force_ended': return 'This session ended automatically due to sustained inactivity'
       default: return reason
     }
   }
@@ -363,6 +383,16 @@ const DashboardContent: React.FC = () => {
             isActive={timerState === 'running' || timerState === 'paused'}
           />
         )}
+
+        {/* Focus Buffer Gauge Card */}
+        <FocusBufferGauge
+          isActive={timerState === 'running' || timerState === 'paused'}
+        />
+
+        {/* Focus Signal Breakdown Card */}
+        <BufferSignalBreakdown
+          isActive={timerState === 'running' || timerState === 'paused'}
+        />
       </div>
 
       {/* First-run permission modal */}
@@ -449,6 +479,40 @@ const DashboardContent: React.FC = () => {
                 {getPlainReason(summary.end_reason)}
               </div>
 
+              {/* Focus Score */}
+              {fullSummary?.focusScoreComponents && (
+                <div style={{ padding: '16px', backgroundColor: '#0f0f17', borderRadius: '10px', border: '1px solid #1e1e2f' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div>
+                      <h4 style={{ color: '#f8fafc', margin: 0, fontSize: '15px' }}>Automatic Focus Score</h4>
+                      <p style={{ color: '#64748b', margin: '4px 0 0 0', fontSize: '12px' }}>
+                        Calculated automatically — no self-reporting needed
+                      </p>
+                    </div>
+                    <div style={{ fontSize: '28px', fontWeight: 700, color: fullSummary.focusScore >= 80 ? '#10b981' : fullSummary.focusScore >= 50 ? '#f59e0b' : '#ef4444' }}>
+                      {fullSummary.focusScore}<span style={{ fontSize: '16px', color: '#64748b' }}>/100</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                    <div style={{ backgroundColor: '#1e1e2f', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}>Buffer Retention</div>
+                      <div style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>{fullSummary.focusScoreComponents.averageBuffer}%</div>
+                    </div>
+                    <div style={{ backgroundColor: '#1e1e2f', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}>Time Focused</div>
+                      <div style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>{fullSummary.focusScoreComponents.focusPercentage}%</div>
+                    </div>
+                    <div style={{ backgroundColor: '#1e1e2f', padding: '10px', borderRadius: '6px', textAlign: 'center' }}>
+                      <div style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}>Visual Attention</div>
+                      <div style={{ color: '#e2e8f0', fontSize: '14px', fontWeight: 600 }}>
+                        {fullSummary.focusScoreComponents.reweighted ? 'N/A (CV Off)' : `${fullSummary.focusScoreComponents.attentionPercentage}%`}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Grid details */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
                 <div style={{ padding: '10px', backgroundColor: '#0f0f17', borderRadius: '8px', border: '1px solid #1e1e2f' }}>
@@ -460,6 +524,14 @@ const DashboardContent: React.FC = () => {
                   <strong style={{ color: '#f8fafc' }}>{formatSummaryDuration(summary.duration_actual_sec)}</strong>
                 </div>
               </div>
+
+              {/* Auto pauses count */}
+              {summary.auto_paused_count !== undefined && summary.auto_paused_count > 0 && (
+                <div style={{ padding: '10px 14px', backgroundColor: '#0f0f17', borderRadius: '8px', border: '1px solid #1e1e2f', fontSize: '13px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ color: '#64748b' }}>Auto-Pauses</span>
+                  <strong style={{ color: '#f59e0b' }}>Auto-paused {summary.auto_paused_count} time{summary.auto_paused_count > 1 ? 's' : ''}</strong>
+                </div>
+              )}
 
               {/* Apps Killed */}
               {summary.apps_killed.length > 0 && (
@@ -525,6 +597,121 @@ const DashboardContent: React.FC = () => {
           to { transform: translateY(0); opacity: 1; }
         }
       `}</style>
+      {/* Auto-Pause Overlay Modal */}
+      {showAutoPauseModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 15, 23, 0.9)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#181824',
+              border: '1.5px solid #ef4444',
+              borderRadius: '24px',
+              padding: '32px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              color: '#f8fafc',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{ padding: '16px', backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: '50%', color: '#ef4444' }}>
+                <Pause size={36} fill="currentColor" />
+              </div>
+            </div>
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px 0' }}>Session Auto-Paused</h2>
+              <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: '1.5', margin: 0 }}>
+                Your focus buffer dropped below 10%. Please take a moment to re-engage before resuming.
+              </p>
+              {mode === 'standard' && (
+                <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '10px', fontWeight: 550 }}>
+                  ⚠️ Standard-mode sessions must be resumed within 2 minutes or they will automatically end.
+                </p>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '10px' }}>
+              <Button variant="danger" size="md" onClick={handleEndFromAutoPause}>
+                End Session
+              </Button>
+              <Button variant="primary" size="md" onClick={handleResumeFromAutoPause}>
+                Resume Focus
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Force-Ended Informational Modal */}
+      {showForceEndModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 15, 23, 0.9)',
+            backdropFilter: 'blur(10px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+            padding: '20px'
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#181824',
+              border: '1.5px solid #272738',
+              borderRadius: '24px',
+              padding: '32px',
+              maxWidth: '460px',
+              width: '100%',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              color: '#f8fafc',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '20px'
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <div style={{ padding: '16px', backgroundColor: 'rgba(96, 165, 250, 0.1)', borderRadius: '50%', color: '#60a5fa' }}>
+                <AlertCircle size={36} />
+              </div>
+            </div>
+            <div>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, margin: '0 0 8px 0' }}>Session Ended</h2>
+              <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: '1.6', margin: 0 }}>
+                This session was ended automatically due to sustained inactivity or distraction. Standard-mode sessions require you to stay engaged. No action is needed; just start a new session when you're ready.
+              </p>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+              <Button variant="primary" size="md" onClick={() => setShowForceEndModal(false)} style={{ width: '120px' }}>
+                OK
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

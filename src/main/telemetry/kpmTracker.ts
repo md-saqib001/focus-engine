@@ -7,9 +7,14 @@ export class KpmTracker {
   private currentSessionId: string | null = null
   private segmentStartTime = 0
   private lastTickTime = 0
+  private lastKpm = 0
 
   public getLastTickTime(): number {
     return this.lastTickTime
+  }
+
+  public getLastKPM(): number {
+    return this.lastKpm
   }
 
   /**
@@ -20,6 +25,7 @@ export class KpmTracker {
     this.currentSessionId = sessionId
     this.segmentStartTime = Date.now()
     this.lastTickTime = Date.now()
+    this.lastKpm = 0
 
     // Start the global keystroke counter hook
     keystrokeCounter.start()
@@ -49,6 +55,7 @@ export class KpmTracker {
     // Stop keyhook to kill background logger binary
     keystrokeCounter.stop()
     this.currentSessionId = null
+    this.lastKpm = 0
     console.log('[KpmTracker] Stopped KPM tracking.')
   }
 
@@ -83,6 +90,7 @@ export class KpmTracker {
     try {
       // 1. Insert metric into SQLite
       insertKPM(this.currentSessionId, kpm)
+      this.lastKpm = kpm
       
       // 2. Broadcast KPM to all renderer windows
       this.broadcastKpmUpdate(kpm)

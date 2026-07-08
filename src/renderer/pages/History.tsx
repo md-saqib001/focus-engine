@@ -232,6 +232,7 @@ const History: React.FC = () => {
                   <th style={thStyle}>Mode</th>
                   <th style={thStyle}>Type</th>
                   <th style={thStyle}>Duration</th>
+                  <th style={thStyle}>Score</th>
                   <th style={thStyle}>Apps Killed</th>
                   <th style={thStyle}>Completed</th>
                   <th style={thStyle}>End Reason</th>
@@ -278,6 +279,25 @@ const History: React.FC = () => {
                           {formatDuration(session.duration_actual_sec)}
                         </td>
                         <td style={tdStyle}>
+                          {session.focus_score !== undefined && session.focus_score !== null ? (
+                            <span
+                              style={{
+                                display: 'inline-block',
+                                padding: '3px 8px',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: 700,
+                                backgroundColor: session.focus_score >= 80 ? 'rgba(16, 185, 129, 0.15)' : session.focus_score >= 50 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                color: session.focus_score >= 80 ? '#10b981' : session.focus_score >= 50 ? '#f59e0b' : '#ef4444'
+                              }}
+                            >
+                              {session.focus_score}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#475569', fontSize: '12px' }}>—</span>
+                          )}
+                        </td>
+                        <td style={tdStyle}>
                           <span style={{ fontWeight: 600, color: (session.apps_killed ?? 0) > 0 ? '#818cf8' : '#64748b' }}>
                             {session.apps_killed ?? 0}
                           </span>
@@ -296,7 +316,7 @@ const History: React.FC = () => {
 
                       {isExpanded && (
                         <tr style={{ backgroundColor: '#09090f' }}>
-                          <td colSpan={7} style={{ padding: '20px 24px', borderBottom: '1px solid #1e1e2f' }}>
+                          <td colSpan={8} style={{ padding: '20px 24px', borderBottom: '1px solid #1e1e2f' }}>
                             {detailLoading ? (
                               <div style={{ color: '#64748b', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <RefreshCw size={14} className="spin" />
@@ -472,6 +492,20 @@ const History: React.FC = () => {
                                               <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Top Distractor</div>
                                               <div style={{ fontSize: '14px', fontWeight: 600, color: '#ef4444', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={summary.mostDistractingDomain || 'None'}>
                                                 {summary.mostDistractingDomain || 'None'}
+                                              </div>
+                                            </div>
+
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Distractions Opened</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                                                {summary.distractionsAttempted}
+                                              </div>
+                                            </div>
+
+                                            <div style={{ backgroundColor: '#0c0c14', border: '1px solid #161624', borderRadius: '8px', padding: '10px 12px' }}>
+                                              <div style={{ fontSize: '11px', color: '#64748b', marginBottom: '4px' }}>Session Pauses</div>
+                                              <div style={{ fontSize: '14px', fontWeight: 600, color: '#f8fafc' }}>
+                                                {summary.totalPauses}
                                               </div>
                                             </div>
                                           </div>
