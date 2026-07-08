@@ -24,8 +24,9 @@ export function calculateFocusScore(sessionId: string): FocusScoreComponents | n
   let averageBuffer = 0
   if (snapshots.length > 0) {
     const sum = snapshots.reduce((acc, curr) => acc + curr.value, 0)
-    // Buffer max is 1000. So value/10 converts to percentage.
-    averageBuffer = (sum / snapshots.length) / 10
+    // FocusBuffer.currentValue is already clamped to 0-100 (see focusBuffer.ts),
+    // so the average of snapshot values is already a 0-100 percentage.
+    averageBuffer = sum / snapshots.length
   }
 
   // 2. Focus Percentage (0 - 100%)

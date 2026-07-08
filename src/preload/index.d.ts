@@ -251,6 +251,50 @@ interface FocusEngineAPI {
   getBufferStateTimeSummary: (sessionId: string) => Promise<IPCResult<{
     [state: string]: number
   }>>
+  analytics: {
+    getHeatmap: () => Promise<IPCResult<{
+      dayOfWeek: number
+      hourOfDay: number
+      avgScore: number
+      sessionCount: number
+    }[]>>
+    getStreaks: () => Promise<IPCResult<{
+      currentStreak: number
+      longestStreak: number
+      isActive: boolean
+      activeDates: string[]
+    }>>
+    getProductivitySummary: () => Promise<IPCResult<{
+      bestHour: { hour: number; avgScore: number } | null
+      worstHour: { hour: number; avgScore: number } | null
+      mostProductiveDay: { dayOfWeek: number; avgScore: number } | null
+      longestSession: { sessionId: string; durationActualSec: number; startTime: number } | null
+      longestFocusStreakMinutes: number
+      averageFocusScore: number | null
+      averageSessionDurationSec: number | null
+      totalSessionsCompleted: number
+      totalFocusedMinutes: number
+    }>>
+    getRecommendations: () => Promise<IPCResult<{
+      hasEnoughData: boolean
+      totalSessionsCount: number
+      bestFocusWindow: {
+        startHour: number
+        endHour: number
+        avgScore: number
+        sessionCount: number
+      } | null
+      mostDistractingApp: {
+        appName: string
+        killCount: number
+      } | null
+      mostDistractingDomain: {
+        domain: string
+        visitCount: number
+      } | null
+      recommendations: string[]
+    }>>
+  }
 }
 
 declare global {

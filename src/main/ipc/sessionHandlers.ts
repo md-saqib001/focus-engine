@@ -1,8 +1,10 @@
 import { ipcMain } from 'electron'
 import {
   saveSession,
-  getAllSessions
+  getAllSessions,
+  updateSessionFocusScore
 } from '../database/sessionRepository'
+import { calculateFocusScore } from '../buffer/focusScoreCalculator'
 
 /**
  * Registers all session-related IPC handlers.
@@ -29,6 +31,12 @@ export function registerSessionHandlers(): void {
     ) => {
       try {
         const session = saveSession(args)
+        const scoreObj = calculateFocusScore(session.session_id)
+        if (scoreObj) {
+          updateSessionFocusScore(session.session_id, scoreObj.finalScore)
+          session.focus_score = scoreObj.finalScore
+        }
+        
         return { success: true, data: session }
       } catch (error) {
         console.error('[IPC session:save]', error)

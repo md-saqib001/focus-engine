@@ -357,6 +357,13 @@ const focusEngineAPI = {
 
   getBufferStateTimeSummary: (sessionId: string) => {
     return ipcRenderer.invoke('buffer:getStateTimeSummary', { sessionId })
+  },
+
+  analytics: {
+    getHeatmap: () => ipcRenderer.invoke('analytics:getHeatmap'),
+    getStreaks: () => ipcRenderer.invoke('analytics:getStreaks'),
+    getProductivitySummary: () => ipcRenderer.invoke('analytics:getProductivitySummary'),
+    getRecommendations: () => ipcRenderer.invoke('analytics:getRecommendations')
   }
 }
 

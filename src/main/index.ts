@@ -9,6 +9,7 @@ import { registerAppBlockingHandlers } from './ipc/appBlockingHandlers'
 import { registerTelemetryHandlers } from './ipc/telemetryHandlers'
 import { registerCVHandlers } from './ipc/cvHandlers'
 import { registerBufferHandlers } from './ipc/bufferHandlers'
+import { registerAnalyticsHandlers } from './ipc/analyticsHandlers'
 import { restoreHostsSync } from './blocking/hostsFileManager'
 import { settingsRepository } from './database/settingsRepository'
 
@@ -75,6 +76,7 @@ app.whenReady().then(() => {
   registerTelemetryHandlers()
   registerCVHandlers()
   registerBufferHandlers()
+  registerAnalyticsHandlers()
 
   createWindow()
 
