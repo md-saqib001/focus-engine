@@ -34,7 +34,6 @@ dmg:
 linux:
   target:
     - AppImage
-    - snap
     - deb
   maintainer: electronjs.org
   category: Utility
@@ -45,6 +44,7 @@ publish:
   provider: github
   owner: md-saqib001
   repo: focus-engine
+  releaseType: release
 
 extraResources:
   - from: build/bin
