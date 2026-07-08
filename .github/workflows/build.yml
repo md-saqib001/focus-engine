@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
 
+  workflow_dispatch:   # lets you manually trigger from the Actions tab to test
+
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ${{ matrix.os }}
